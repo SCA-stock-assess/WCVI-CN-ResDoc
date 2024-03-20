@@ -1,10 +1,12 @@
 # Packages ----------------------------------------------------------------
 
-pkgs <- c('tidyverse','RColourBrewer','gganimate','ggrepel','readxl','janitor', 'here')
+pkgs <- c(
+  'tidyverse','RColourBrewer','gganimate','ggrepel',
+  'readxl', 'writexl','janitor', 'here'
+)
 #install.packages(pkgs)
-#devtools::install_github("thomasp85/transformr") # transformr package required for gganimate
 
-library(tidyverse); theme_set(theme_light(base_size = 20))
+library(tidyverse); theme_set(theme_light(base_size = 18))
 library(janitor)
 library(RColorBrewer)
 library(gganimate)
@@ -101,7 +103,8 @@ kobe_data <- indicator_esc |>
     .by = year,
     escapement = sum(escapement),
     umsy = mean(umsy),
-    smsy = sum(smsy_median)
+    smsy = sum(smsy_median),
+    rivers = paste0(river, collapse = "; ")
   ) |> 
   left_join(rch_er) |> 
   mutate(
@@ -122,8 +125,19 @@ kobe_data <- indicator_esc |>
       quadrant == 5 ~ "darkgoldenrod1" # Nothing falls in this quadrant
     )
   ) |> 
+  relocate(rivers, .after = last_col()) |> # Move "rivers" list to the end
   # Remove years with missing data
   filter(!if_any(!year, is.na)) 
+
+
+# Save the output data
+writexl::write_xlsx(
+  select(.data = kobe_data, -colour, -quadrant),
+  here(
+    "Kobe plot", 
+    paste0("R-OUT_Kobe_plot_raw_data_", Sys.Date(), ".xlsx")
+  )
+)
 
 
 # Plots -------------------------------------------------------------------
@@ -204,30 +218,43 @@ quadLabs <- data.frame(
 
 # Add points and path
 (filled_kobe <- base_kobe +
-  geom_path(aes(alpha = year)) +
-  geom_point(
-    shape = 21,
-    fill = kobe_data$colour,
-    size = 3,
-     colour = ifelse(
-       kobe_data$year %in% c(min(kobe_data$year), max(kobe_data$year)),
-       "blue",
-       kobe_data$colour
-     )
-  ) +
-  geom_label_repel(
-    data = filter(kobe_data, year %in% c(min(year), max(year))),
-    aes(label = year),
-    colour = "blue",
-    fill = alpha("white", alpha = 0.75),
-    size = 5,
-    min.segment.length = 0,
-    segment.colour = "blue",
-    segment.size = 0.75,
-    box.padding = 0.5,
-    label.size = 0
-  ) +
-  scale_alpha_continuous(range = c(0.025,0.8))
+    geom_path(aes(alpha = year)) +
+    geom_point(
+      shape = 21,
+      fill = kobe_data$colour,
+      alpha = 0.75,
+      size = 3,
+      colour = ifelse(
+        kobe_data$year %in% c(min(kobe_data$year), max(kobe_data$year)),
+        "blue",
+        alpha(kobe_data$colour, 0.75)
+      )
+    ) +
+    geom_label_repel(
+      data = filter(kobe_data, year %in% c(min(year), max(year))),
+      aes(label = year),
+      colour = "blue",
+      fill = alpha("white", alpha = 0.75),
+      size = 5,
+      min.segment.length = 0,
+      segment.colour = "blue",
+      segment.size = 0.75,
+      segment.curvature = 0.03,
+      segment.angle = 90,
+      box.padding = 0.7,
+      label.size = 0
+    ) +
+    scale_alpha_continuous(range = c(0.025,0.8))
+)
+
+
+# Save the filled Kobe plot
+ggsave(
+  here("Kobe plot", "R-PLOT_WCVI_CN_Nat_Kobe.png"),
+  filled_kobe,
+  height = 5,
+  width = 7,
+  units = "in"
 )
 
 
@@ -246,7 +273,7 @@ quadLabs <- data.frame(
 # Animate it
 anim <- animate(animated_kobe, duration = 60, fps = 20, 
                 width = 13.3333, height = 7.5, units = "in", 
-                res = 150, #Resolution is in pixels-per-inch (ppi)
+                res = 150, # Resolution is in pixels-per-inch (ppi)
                 renderer = gifski_renderer(), 
                 end_pause = 20*10) # End pause is in frames: 20 frames * 10 = 10 seconds
 
