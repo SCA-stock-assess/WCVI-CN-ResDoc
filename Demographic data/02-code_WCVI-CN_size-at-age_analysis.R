@@ -37,7 +37,7 @@ convert_fl_poh <- function(measurement, input = c("lf", "poh")) {
 }
 
 
-# Load and concatenate all CREST biodata ----------------------------------
+# Load and collate all CREST biodata ----------------------------------
 
 
 # Save a list of the data file names
@@ -284,26 +284,114 @@ full_data <- crest_data |>
 
 # Trim non-WCVI origin fish from the full data ----------------------------
 
-
-# First need to standardize stock of origin names
-split_data <- full_data |> 
-  distinct(dataset, resolved_stock_id) |> 
-  mutate(
-    resolved_stock_id = str_remove_all(
-      resolved_stock_id,
-      "(?i)river|hatchery|creek|\\br\\b|\\bcr\\b|\\(assumed\\)"
-    ) |> 
-      str_to_lower()
-  ) %>% 
-  split(.$dataset) |> 
-  map(~select(.x, -dataset))
-
-
-stock_names <- stringdist_full_join(
-  split_data[[1]], 
-  split_data[[2]], 
-  method = "hamming"
+# List of WCVI river (and hatchery) names
+wcvi_cn_rivers <- tibble(
+  wcvi_names = c(
+    "artlish", "ash", "bedwell", "burman","cayeghle",
+    "clemens", "colonial", "colonial cayeghle","conuma", "cypre", "effingham", "gold",
+    "great central lake", "kaouk", "kauwinch", "kennedy", "leiner",
+    "lowry", "marble", "megin", "moyeha", "nahmint", "nitinat",
+    "omega pacific", "robertson", "san juan", "sarita", "sproat",
+    "stamp", "tahsis", "tahsish", "thornton", "tofino", "toquaht",
+    "tranquil", "ursus", "zeballos"
   )
+)
+
+
+# Create lookup table to bridge messy stock names to clean WCVI names
+stock_cleanup <- full_data |> 
+  count(dataset, resolved_stock_id) |> 
+  # First need to standardize stock of origin names
+  mutate(
+    cleaned_stock_id = str_remove_all(
+      resolved_stock_id,
+      "^.*(?=-)|\\(assumed\\)" # remove anyhing preceding a dash, and "(assumed)"
+    ) |> 
+      str_replace_all("[:punct:]", " ") |> # Remove any punctuation characters
+      # Remove all versions of river, hatchery, etc from names
+      str_remove_all("(?i)\\b(river|hatchery|creek|fishway|dam|system|inlet|harbour|seapen|r|cr|h)\\b") |> 
+      str_replace_all("[:space:]+", " ") |> # Collapse all spaces to single
+      str_trim() # Remove leading/trailing blank spaces
+  ) |> 
+  filter(!is.na(resolved_stock_id)) |> 
+  stringdist_left_join(
+    wcvi_cn_rivers, 
+    by = c(cleaned_stock_id = "wcvi_names"),
+    max_dist = 1,
+    ignore_case = TRUE,
+    distance_col = "dist"
+  ) %T>%
+  # Print (but don't save) duplicated rows 
+  {filter(
+    ., 
+    .by = c(dataset, resolved_stock_id),
+    n() > 1
+  )  |> 
+      print()
+  } |> 
+  # Trim duplicated rows
+  arrange(dist) |> # Place lowest "dist" values highest to remove poorer matches
+  filter(!duplicated(cbind(dataset, resolved_stock_id))) %T>% 
+  # Print (but don't save) duplicated rows 
+  {filter(
+    ., 
+    .by = c(dataset, resolved_stock_id),
+    n() > 1
+  )  |> 
+      print()
+  }
+# Looks good! Need to keep checking this to ensure nothing slips through as new 
+# data are added
+
+
+# Now filter the data to remove all non WCVI-origin fish, as well as 
+# Any fish with missing ages or lengths
+trim_data <- full_data |> 
+  left_join(
+    select(.data = stock_cleanup, dataset, resolved_stock_id, wcvi_names),
+    relationship = "many-to-one"
+    ) |> 
+  # Clean up values in age and sex
+  mutate(
+    resolved_age = if_else(
+      str_detect(resolved_age, "^(3|4|5|6)"),
+      str_extract(resolved_age, "^.{1}"),
+      NA_character_
+    ) |> 
+      as.numeric()
+  ) |> 
+  # Remove non-WCVI stocks, and missing values in length or age
+  filter(!if_any(c(wcvi_names, poh_length, resolved_age), is.na)) 
+
+
+
+# Clean up messy variables in the data ------------------------------------
+
+
+# Cleaned version
+clean_data <- trim_data |> 
+  mutate(
+    sex = case_when(
+      str_detect(sex, "(?i)^(j|m)") ~ "male",
+      str_detect(sex, "(?i)^f") ~ "female",
+      T ~ NA_character_
+    ),
+    origin = case_when(
+      str_detect(origin, "(?i)hat|y") ~ "hatchery",
+      str_detect(origin, "(?i)nat") ~ "natural",
+      T ~ "unknown"
+    ),
+    sample_date = convert_to_date(sample_date), # Convenient janitor fn
+    area = str_extract(area, "(2|12)[:graph:]*(?=\\b)"),
+    sample_source = case_when(
+      str_detect(sample_source, "(?i)(gill|gn)") ~ "gill net",
+      str_detect(sample_source, "(?i)(seine|sn)") ~ "seine net",
+      str_detect(sample_source, "(?i)(troll|tr)") ~ "troll",
+      str_detect(sample_source, "(?i)brood|hatch") ~ "hatchery",
+      T ~ str_to_lower(sample_source)
+    )
+  )
+
 
 # Plots to examine size-at-age trends -------------------------------------
 
