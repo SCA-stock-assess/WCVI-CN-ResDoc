@@ -1,7 +1,7 @@
 # Packages & functions -----------------------------
 
 pkgs <- c(
-  "tidyverse", "magrittr", "ggridges", "here", "read_xl", "fuzzyjoin"
+  "tidyverse", "magrittr", "ggridges", "ggpmisc","here", "read_xl", "fuzzyjoin"
 )
 #install.packages(pkgs)
 
@@ -11,6 +11,7 @@ library(janitor)
 library(fuzzyjoin)
 library(magrittr)
 library(ggridges)
+library(ggpmisc)
 library(here)
 
 
@@ -18,23 +19,139 @@ library(here)
 na_strings <- c("", " ", "N/A", "#N/A", "NA", "N/S", "na")
 
 
-# Function to convert FL to POH length and vice versa
-# Based on 20 years of biodata collected from WCVI Chinook in ENPRO
-convert_fl_poh <- function(measurement, input = c("lf", "poh")) {
-  if(!input %in% c("fl", "poh")) {
-    stop("Input must be 'fl' or 'poh'") # Throw error if input is incorrectly specified
+
+# Load historical ENPRO data from 1992-2018 -------------------------------
+
+
+# ENPRO file that I found randomly on the network drives
+enpro_data <- list.files(
+  here("Demographic data"),
+  pattern = "(?i)enpro",
+  full.names = TRUE
+) |> 
+  read_xlsx(sheet = "Data") |> 
+  clean_names() |> 
+  mutate(
+    age_cwt = if_else(!is.na(cwt_tag_code), year - brood_year, NA_real_),
+    across(everything(), as.character)
+  ) |> 
+  select(
+    year,
+    statarea,
+    project,
+    sample_source, 
+    matches("sample.*date"),
+    life_stage,
+    sex_final,
+    cwt_tag_code,
+    post_orbital_hypural_poh,
+    site_river_location,
+    adipose_fin_clip,
+    enpro_source_facility,
+    brood_year,
+    contains("age"),
+    contains("length"),
+    -total_length, # No numeric variables in this column, just "TRUE" or NAs
+    -length_unknown_type # These values are of no use
+  ) |>
+  # Fix up ages and assign stocks
+  mutate(
+    # Convert complete GR ages to total ages
+    across(
+      c(resolved_age, age_gr), 
+      ~if_else(
+        str_detect(.x,"[:digit:]{2}"),
+        str_extract(.x, "^[:digit:]{1}"),
+        .x
+      )
+    ),
+    # Fix up resolved_age values, drawing from other age columns where available
+    # Will assume sub1s for partial ages when stocks have been filtered to WCVI-origin
+    resolved_age = case_when(
+      !is.na(age_cwt) ~ age_cwt,
+      resolved_age %in% c("0", "No Age", "Reading Error") ~ age_gr,
+      str_detect(resolved_age, "0[:digit:]") & !is.na(age_gr) ~ age_gr,
+      str_detect(resolved_age, "0[:digit:]") & is.na(age_gr) ~ str_remove(resolved_age, "0"),
+      is.na(resolved_age) & !is.na(age_gr) ~ age_gr,
+      T ~ resolved_age
+    ),
+    # Use sampling sites as stock names when no ENPRO facility is assigned
+    resolved_stock_id = if_else(
+      is.na(enpro_source_facility) & sample_source %in% c("River Assessment", "Hatchery Assessment"), 
+      site_river_location, 
+      enpro_source_facility
+    ),
+    across(everything(), parse_guess)
+  ) |> 
+  rename(
+    "poh_length" = post_orbital_hypural_poh,
+    "nose_fork_length" = fork_length_nose_fork
+  )
+
+
+# Investigate potential conversions between other lengths to poh
+poh_conv_models <- enpro_data |> 
+  select(contains("length"), -poh_length) |> 
+  colnames() |> 
+  as_tibble_col(column_name = "length_type") |> 
+  mutate(
+    data = map(
+      .x = length_type,
+      ~ enpro_data |> 
+        select(poh_length, all_of(.x)) |> 
+        filter(!if_any(everything(), is.na)) |> 
+        rename("length2" = 2)
+    ),
+    mod = map(
+      .x = data,
+      ~lm(poh_length ~ length2, data = .x)
+    ),
+    coef = map(mod, coef),
+    r_sq = map(mod, summary) |> map('r.squared')
+  ) |> 
+  unnest_wider(coef)
+
+
+# Show the regressions
+poh_conv_models |> 
+  select(length_type, data) |> 
+  unnest(data) |> 
+  ggplot(aes(length2, poh_length)) +
+  facet_wrap(~length_type, nrow = 1, strip.position = "bottom") +
+  stat_binhex() +
+  scale_fill_viridis_c(option = "rocket") +
+  stat_poly_line() +
+  stat_poly_eq(use_label(c("eq", "R2"))) +
+  labs(x = NULL) +
+  theme(
+    strip.placement = "outside",
+    strip.background = element_blank()
+  )
+
+
+# Save function to convert lengths
+convert_to_poh <- function(measurement, input = c("fl", "sl")) {
+  if(!input %in% c("fl", "sl")) {
+    stop("Input must be 'fl' or 'sl'") # Throw error if input is incorrectly specified
   } 
   
-  if(input == "fl") {
+  pred_data <- mutate(
+    .data = poh_conv_models,
+    val = measurement,
+    pred = `(Intercept)` + val*length2
+  )
+  
+
+    if(input == "fl") {
     # These values from a linear regression of NF on POH; R squared of 0.97
-    result <- (measurement/1.2228) - 8.3166 
+    return(pred_data[pred_data$length_type == "nose_fork_length",]$pred)
   } else {
-    result <- (measurement*1.2228) + 8.3166
+    return(pred_data[pred_data$length_type == "standard_length",]$pred)
   }
   # On average, the conversion will err by ~3%
   
-  return(round(result, 0)) # Round to nearest mm
 }
+
 
 
 # Load and collate all CREST biodata ----------------------------------
@@ -210,6 +327,7 @@ rch_f_data <- list.files(
     "poh_length" = post_orbital_hypural_poh,
     "area" = statarea
   )
+
 
 
 
