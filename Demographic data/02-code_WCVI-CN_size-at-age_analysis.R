@@ -1,7 +1,8 @@
 # Packages & functions -----------------------------
 
 pkgs <- c(
-  "tidyverse", "magrittr", "ggridges", "ggpmisc","here", "read_xl", "fuzzyjoin"
+  "tidyverse", "magrittr", "ggridges", "ggpmisc",
+  "here", "read_xl", "fuzzyjoin", "broom.mixed", "merTools"
 )
 #install.packages(pkgs)
 
@@ -13,6 +14,9 @@ library(magrittr)
 library(ggridges)
 library(ggpmisc)
 library(here)
+library(lme4)
+library(broom.mixed)
+library(merTools)
 
 
 # Save list of all possible NA strings
@@ -26,8 +30,8 @@ wcvi_cn_rivers <- tibble(
     "great central lake", "kaouk", "kauwinch", "kennedy", "leiner",
     "lowry", "marble", "megin", "moyeha", "nahmint", "nitinat",
     "omega pacific", "robertson", "san juan", "sarita", "sproat",
-    "stamp", "tahsis", "tahsish", "thornton", "tofino", "toquaht",
-    "tranquil", "ursus", "zeballos"
+    "stamp", "stamp above falls", "tahsis", "tahsish", "thornton", "tofino", 
+    "toquaht","tranquil", "ursus", "zeballos"
   )
 )
 
@@ -40,7 +44,9 @@ clean_stock_id <- function(stock_name) {
     str_remove_all("^.*(?=-)|\\(assumed\\)") |> 
     str_replace_all("[:punct:]", " ") |> # Remove any punctuation characters
     # Remove all versions of river, hatchery, etc from names
-    str_remove_all("(?i)\\b(river|hatchery|creek|fishway|dam|system|inlet|harbour|seapen|r|cr|h)\\b") |> 
+    str_remove_all(
+      "(?i)\\b(river|hatchery|creek|fishway|dam|system|inlet|harbour|band|seapen|estuary|r|cr|h)\\b"
+    ) |> 
     str_replace_all("[:space:]+", " ") |> # Collapse all spaces to single
     str_trim() |> # Remove leading/trailing blank spaces
     str_to_lower()
@@ -49,10 +55,144 @@ clean_stock_id <- function(stock_name) {
 }
 
 
-# Load historical ENPRO data from 1992-2018 -------------------------------
+# Load SEP WCVI major ops data from 1998-2023 -------------------------------
 
 
-# ENPRO file that I found randomly on the network drives
+# EPRO adult biosampling files (xlsx)
+epro_xlsx <- list.files(
+  here("Demographic data", "SEP data"),
+  pattern = "(?i)all_adult_biosampling_[[:digit:]]{4}.*xlsx",
+  full.names = TRUE
+) |> 
+  as_tibble_col(column_name = "path") |> 
+  rowwise() |> 
+  mutate(
+    sheet = excel_sheets(path),
+    data = list(
+      read_excel(
+        path, 
+        sheet = sheet, 
+        na = na_strings,
+        skip = 1
+        )
+      )
+  ) |> 
+  select(-(path:sheet)) |> 
+  unnest(data) |> 
+  clean_names()
+
+
+# EPRO adult biosampling files (csv)
+epro_csv <- list.files(
+  here("Demographic data", "SEP data"),
+  pattern = "(?i)all_adult_biosampling_[[:digit:]]{4}.*csv",
+  full.names = TRUE
+) |> 
+  as_tibble_col(column_name = "path") |> 
+  rowwise() |> 
+  mutate(
+    data = list(read.csv(path, na.strings = na_strings)),
+    .keep = "unused"
+  ) |> 
+  unnest(data) |> 
+  clean_names() |> 
+  rename("egg_retention_percent" = egg_retention)
+
+
+# EPRO data (incl 2021-2023 with results file)
+epro_data <- list.files(
+  here("Demographic data", "SEP data"),
+  pattern = "(?i)r_out.*all adult biosampling",
+  full.names = TRUE
+) |> 
+  read_excel(sheet = 2) |> 
+  clean_names() |> 
+  mutate(across(everything(), as.character)) |> 
+  # Add the 2020 data that were imported above
+  bind_rows(
+    list(epro_xlsx, epro_csv) |> 
+      map(
+        ~mutate(
+          .data = .x,
+          across(everything(), as.character)
+        )
+      )
+  ) |> 
+  mutate(
+    across(everything(), parse_guess),
+    start_date = as.Date(start_date, format = "%m/%d/%Y"),
+    year = str_extract_all(spawning_stock, "\\d{4}") |> as.integer(),
+    resolved_age = case_when(
+      !is.na(r_resolved_total_age) ~ r_resolved_total_age,
+      cwt_age_yrs %in% c(1:6) ~ cwt_age_yrs,
+      !is.na(scale_total_age_yrs) ~ scale_total_age_yrs,
+      !is.na(scale_gilbert_age) ~ round(scale_gilbert_age, -1) / 10,
+      str_detect(scale_part_age, "\\dM") ~ as.numeric(str_extract(scale_part_age, "\\d")) + 1,
+      T ~ NA_real_
+    ),
+    resolved_stock_id = case_when(
+      !is.na(r_resolved_stock_id) ~ r_resolved_stock_id,
+      str_detect(spawning_stock, "(?i)sarita") ~ "Sarita R (assumed)",
+      str_detect(spawning_stock, "(?i)burman") ~ "Burman R (assumed)",
+      str_detect(spawning_stock, "(?i)nahmint") ~ "Nahmint R (assumed)",
+      str_detect(spawning_stock, "(?i)robertson") ~ "Robertson Cr (assumed)",
+      str_detect(spawning_stock, "(?i)conuma") ~ "Conuma R (assumed)",
+      T ~ NA_character_
+    ),
+    area = case_when(
+      str_detect(spawning_stock, "(?i)sarita|nahmint|robertson") ~ 23,
+      str_detect(spawning_stock, "(?i)burman|conuma|gold") ~ 25,
+      str_detect(spawning_stock, "(?i)nitinat") ~ 22,
+      str_detect(spawning_stock, "(?i)san juan") ~ 21,
+      T ~ NA_real_
+    ),
+    major_ops = "yes",
+    brood_year = year - resolved_age,
+    origin = case_when(
+      !is.na(r_origin) ~ r_origin,
+      external_marks == "Clipped" ~ "Hatchery",
+      !hatch_code %in% c("Destroyed", "No Mark", "Not Marked", "No Sample", NA) ~ "Hatchery",
+      hatch_code %in% c("Not Marked", "No Mark") ~ "Natural",
+      T ~ "Unknown"
+    ),
+    sex = case_when(
+      str_detect(maturity_class, "(?i)female") ~ "female",
+      str_detect(maturity_class, "(?i)male|jack|jimmy") ~ "male",
+      TRUE ~ "Unknown"
+    )
+  ) |> 
+  select(
+    year,
+    area,
+    spawning_stock,
+    major_ops,
+    parent_activity_type,
+    sex,
+    start_date,
+    maturity_class,
+    cwt_tag_code,
+    contains("length"),
+    source_location_type,
+    external_marks,
+    brood_year,
+    resolved_age,
+    resolved_stock_id,
+    origin
+  ) |> 
+  rename(
+    "project" = spawning_stock,
+    "sample_source" = parent_activity_type,
+    "sample_date" = start_date,
+    "life_stage" = maturity_class,
+    "poh_length" = poh_length_mm,
+    "nose_fork_length" = nose_to_fork_length_mm,
+    "standard_length" = standard_length_mm,
+    "site_river_location" = source_location_type,
+    "adipose_fin_clip" = external_marks
+  )
+
+
+# ENPRO (+misc) file that I found randomly on the network drives
 enpro_data <- list.files(
   here("Demographic data", "SEP data"),
   pattern = "(?i)enpro",
@@ -60,14 +200,18 @@ enpro_data <- list.files(
 ) |> 
   read_xlsx(sheet = "Data") |> 
   clean_names() |> 
+  # Keep only WCVI hatchery projects
+  filter(str_detect(str_to_lower(project), paste(wcvi_cn_rivers$wcvi_names, collapse = "|"))) |> 
   mutate(
     age_cwt = if_else(!is.na(cwt_tag_code), year - brood_year, NA_real_),
-    across(everything(), as.character)
+    across(everything(), as.character),
+    major_ops = if_else(str_detect(project, "(?i)\\d{4}.*chinook"), "yes", "no")
   ) |> 
   select(
     year,
     statarea,
     project,
+    major_ops,
     sample_source, 
     matches("sample.*date"),
     life_stage,
@@ -122,10 +266,20 @@ enpro_data <- list.files(
     "sample_date" = sample_start_date
   )
 
+
+# Join EPRO to ENPRO+ data
+sep_data <- list(enpro_data, epro_data) |> 
+  map(~mutate(.x, across(everything(), as.character))) |> 
+  list_rbind() |> 
+  mutate(
+    across(everything(), parse_guess),
+    resolved_stock_id = clean_stock_id(resolved_stock_id)
+  )
+
   
 
 # Investigate potential conversions between other lengths to poh
-poh_conv_models <- enpro_data |> 
+poh_conv_models <- sep_data |> 
   select(contains("length"), -poh_length) |> 
   colnames() |> 
   as_tibble_col(column_name = "length_type") |> 
@@ -187,21 +341,27 @@ convert_to_poh <- function(measurement, input = c("fl", "sl")) {
 }
 
 
+# Convert fork lengths to poh lengths, where available
+sep_data <- sep_data |> 
+  mutate(
+    poh_length_corrected = if_else(
+      is.na(poh_length) & str_detect(nose_fork_length, "\\d{2,4}"),
+      convert_to_poh(as.numeric(nose_fork_length), input = "fl"),
+      poh_length
+    )
+  )
+
 
 # Load and collate all CREST biodata ----------------------------------
 
 
-# Save a list of the data file names
-crest_files <- list.files(
-  here("Demographic data", "CREST data"),
-  pattern = "(?i)crest",
-  full.names = TRUE
-) |> 
-  as_tibble_col(column_name = "path")
-
 
 # Extract the data from the WCVI Run Reconstruction tabs
-crest_data <- crest_files |> 
+crest_data <- list.files(
+  here("Demographic data", "CREST data"),
+  full.names = TRUE
+) |> 
+  as_tibble_col(column_name = "path") |> 
   mutate(
     data = map(
       .x = path,
@@ -209,7 +369,7 @@ crest_data <- crest_files |>
         path = .x, 
         sheet = "WCVI_Chinook_Run_Rec",
         na = na_strings,
-        col_types = "text" # prevents a deluge of unnecissary coltype warnings
+        col_types = "text" # prevents a deluge of unnecessary coltype warnings
         ),
       .progress = "Data read progress:"
     )
@@ -272,6 +432,7 @@ crest_data <- crest_files |>
 # Keep it or drop it?
 # Or compare lab numbers and remove any that overlap Katie's dataset...?
 # Ideally the latter
+
 
 
 # Load escapement & FSC biodata from StAD file and from historical biodata ----------
@@ -379,12 +540,14 @@ rch_f_data <- list.files(
 
 
 # Check whether any overlap between samples in esc biodata and RCH female biodata
-merge_data <- lst(rch_f_data, esc_data)
+merge_data <- lst(rch_f_data, stad_data)
+
 
 # Otolith numbers
 merge_data |> 
   map(~select(.x, oto_nums_concat)) %>%
   {inner_join(.[[1]], .[[2]])}
+
 
 # CWT numbers
 (overlapping_cwts <- merge_data |> 
@@ -419,30 +582,30 @@ merge1 <- merge_data |>
 
 
 
-# Collate ENPRO data with escapement/rch fem data -------------------------
+# Collate SEP data with escapement/rch fem data -------------------------
 
 
 # Check the degree of overlap in years
-merge2_rule <- enpro_data |> 
+merge2_rule <- sep_data |> 
   mutate(year = as.character(year)) |> 
-  count(resolved_stock_id, year, name = "enpro_n") |> 
+  count(resolved_stock_id, year, name = "sep_n") |> 
   full_join(count(merge1, year, resolved_stock_id)) |> 
   # Stipulate rules for keeping one dataset versus the other |> 
   mutate(
     to_keep = case_when(
-      is.na(n) & !is.na(enpro_n) ~ "enpro",
-      !is.na(n) & is.na(enpro_n) ~ "other",
-      enpro_n > n ~ "enpro",
-      n >= enpro_n ~ "other"
+      is.na(n) & !is.na(sep_n) ~ "sep",
+      !is.na(n) & is.na(sep_n) ~ "other",
+      sep_n > n ~ "sep",
+      n >= sep_n ~ "other"
     )
   ) %>% 
   split(.$to_keep)
 
 
 # Merge ENPRO data with the previous section's data
-merge2 <- enpro_data |> 
+merge2 <- sep_data |> 
   mutate(
-    dataset = "enpro",
+    dataset = "sep",
     across(everything(), as.character)
   ) |> 
   select(colnames(merge1)) |> 
@@ -450,7 +613,7 @@ merge2 <- enpro_data |>
   anti_join(select(merge2_rule$other, year, resolved_stock_id)) |> 
   bind_rows(
     merge1 |> 
-      anti_join(select(merge2_rule$enpro, year, resolved_stock_id))
+      anti_join(select(merge2_rule$sep, year, resolved_stock_id))
   )
 
 
@@ -545,7 +708,7 @@ trim_data <- full_data |>
   left_join(
     select(.data = stock_cleanup, dataset, resolved_stock_id, wcvi_names),
     relationship = "many-to-one"
-    ) |> 
+  ) |> 
   # Clean up values in age and sex
   mutate(
     resolved_age = case_when(
@@ -593,14 +756,16 @@ clean_data <- trim_data |>
     ),
     across(where(is.character), parse_guess)
   ) |> 
-  # Remove some extreme outlier/error measurements
   filter(
+    # Remove some extreme outlier/error measurements
     !poh_length > 1300,
-    !(poh_length < 350 & resolved_age > 3)
+    !(poh_length < 350 & resolved_age > 3),
+    # Keep only sport and escapement samples from CREST
+    !(dataset == "CREST/FOS" & str_detect(sample_source, "(?i)esc|sport", negate = TRUE))
   )
 
 
-# Plots to examine size-at-age trends -------------------------------------
+# Exploratory plots to look at structure of data between datasets ----------------------------
 
 
 # Question 1: Is there a broad trend evident in all WCVI-origin fish?
@@ -613,9 +778,7 @@ clean_data |>
   ) +
   geom_bin_2d(binwidth = c(1, 50)) +
   geom_smooth()
-# If anything, this plot show size-at-age increasing
-# However, these data are likely confounded by differences in sample 
-# sources or stock compositions over the years
+# Possible decrease?
 
 
 # Question 2: Can we resolve any stock-specific trends in size-at-age?
@@ -635,7 +798,7 @@ clean_data |>
       geom_smooth(se = FALSE) +
       labs(title = .y)
   )
-# Is the spike in recent years real or driven by a change in sampling methodology?  
+# Not much is clear here
   
 
 # Question 3: Where are the majority of observations coming from over time?
@@ -644,6 +807,34 @@ clean_data |>
   ggplot(aes(year, dataset)) +
   geom_tile(aes(fill = n))
 # CREST data takes over after 2018... Could be a different length measure
+
+
+# CREST data consistently longer. 
+clean_data |> 
+  filter(!sample_source == "sport") |> 
+  mutate(
+    crest_poh = if_else(
+      dataset == "CREST/FOS", 
+      convert_to_poh(poh_length, "fl"),
+      NA_real_
+      )
+    ) |> 
+  summarize(
+    .by = c(resolved_age, dataset), 
+    avg_length = mean(poh_length),
+    avg_crest_poh = mean(crest_poh)
+  ) |> 
+  pivot_longer(contains("avg")) |> 
+  pivot_wider(
+    names_from = dataset, 
+    values_from = value
+  ) |> 
+  filter(!is.na(`CREST/FOS`)) |> 
+  group_by(resolved_age) |> 
+  fill(sep:stad_data) |> 
+  mutate(avg_diff = `CREST/FOS`/((sep+stad_data)/2))
+# The POH conversion developed using EPRO data might work...
+# An age-specific conversion might work even better
 
 
 # Question 4: Same as Question 2, but what if we remove CREST data?
@@ -670,6 +861,7 @@ clean_data |>
 
 # Question 5: Same as Question 1, but broken out by dataset
 clean_data |> 
+  filter(!(dataset == "CREST/FOS" & sample_source != "sport")) |> 
   filter(resolved_age %in% c(3:6)) |> 
   ggplot(aes(year, poh_length)) +
   facet_grid(dataset ~ resolved_age) +
@@ -679,16 +871,144 @@ clean_data |>
 # Can anything be done to reduce the noise in the datasets?
 
 
-# Question 6: How are lengths in the CREST data for non-sport samples?
-clean_data |> 
+# Question 6: How are lengths in the CREST data?
+crest_data |> 
   filter(
     resolved_age %in% c(3:6),
-    dataset == "CREST/FOS"
+    poh_length < 1300
   ) |> 
+  group_by(sample_source, resolved_age) |> 
+  filter(!(length(unique(year)) < 5)) |> 
   ggplot(aes(year, poh_length)) +
-  facet_grid(~ sample_source) +
+  facet_grid(resolved_age ~ sample_source) +
   geom_bin_2d(binwidth = c(1, 50)) +
   stat_poly_line() +
   stat_poly_eq()
 # Can anything be done to reduce the noise in the datasets?
 
+
+
+# Plots showcasing trends in size-at-age using reliable data --------------
+
+
+# What we learned from the last section is that:
+# - lengths in CREST cannot easily be compared to the SEP or STAD escapement data
+# - Only CREST sport and SEP escapement data have long enough time series for 
+#   a valid size-at-age analysis
+# - Most stock do not have enough data for a size-at-age analysis
+
+
+# Trim data to only stocks with a 10+yr time series
+strict_data <- clean_data |> 
+  filter(
+    !(dataset == "CREST/FOS" & sample_source != "sport"),
+    resolved_age %in% 3:5
+  ) |> 
+  mutate(
+    .by = c(dataset, resolved_age, year, resolved_stock_id),
+    n = n(),
+    dataset = if_else(dataset == "CREST/FOS", "Sport", "Escapement")
+  ) |> 
+  mutate(
+    .by = c(dataset, resolved_age, resolved_stock_id),
+    years = length(unique(year))
+  ) |> 
+  group_by(dataset, resolved_stock_id) |> 
+  filter(!any(years < 10))  |> 
+  ungroup()
+
+
+# Plot time series data by age and stock
+strict_data %>%
+  split(.$dataset) |> 
+  imap(
+    ~ ggplot(.x, aes(year, poh_length)) +
+      facet_grid(resolved_stock_id ~ resolved_age) +
+      stat_bin2d(binwidth = c(1, 50)) +
+      stat_poly_line() +
+      stat_poly_eq(use_label(c("eq", "R2"))) +
+      scale_fill_viridis_c(option = "rocket") +
+      labs(title = .y)
+  )
+
+
+# Using ggridges
+strict_data %>%
+  split(.$dataset) |> 
+  imap(
+    ~ .x |> 
+      ggplot(
+        aes(
+          poh_length, 
+          fct_rev(as.character(year)),
+          fill = n
+          )
+        ) +
+      facet_grid(
+        resolved_age ~ resolved_stock_id,
+        scales = "free"
+      ) +
+      geom_density_ridges() +
+      scale_fill_viridis_c(option = "mako", direction = -1) +
+      labs(
+        title = .y,
+        x = "Length (mm)",
+        y = "Year"
+      ) +
+      theme_ridges()
+  )
+
+
+
+# Model size-at-age data --------------------------------------------------
+
+
+# First pass model structure
+mod1 <- lmer(
+  poh_length ~ as.character(resolved_age)*scale(year)*dataset + (scale(year)|resolved_stock_id),
+  data = strict_data
+)
+# Model converges
+
+summary(mod1)
+car::Anova(mod1, type = 3)
+
+
+# Dataset of model predictions
+mod1_preds <- strict_data |> 
+  tidyr::expand(resolved_age, nesting(dataset, year, resolved_stock_id)) %>%
+  mutate(pred = predictInterval(mod1, newdata = .)) |> 
+  unnest(pred) 
+
+
+# Plot predictions
+strict_data |> 
+  mutate(group = "observed") |> 
+  bind_rows(mutate(mod1_preds, group = "predicted")) %>%
+  split(.$dataset) |> 
+  imap(
+    ~ .x |> 
+      filter(group == "observed") |> 
+      ggplot(aes(year, poh_length)) +
+      facet_grid(resolved_stock_id ~ resolved_age) +
+      #stat_bin2d(binwidth = c(1, 50)) +
+      geom_point(
+        size = 0.5,
+        alpha = 0.2,
+        position = position_jitter(width = 0.25)
+      ) +
+      geom_line(
+        data = filter(.x, group == "predicted"),
+        aes(y = fit),
+        colour = "blue"
+      ) +
+      geom_ribbon(
+        data = filter(.x, group == "predicted"),
+        aes(ymin = lwr, ymax = upr),
+        colour = NA,
+        fill = "blue",
+        alpha = 0.25
+      ) +
+      scale_fill_viridis_c(option = "rocket") +
+      labs(title = .y)
+  )
