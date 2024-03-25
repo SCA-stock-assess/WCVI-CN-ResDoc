@@ -54,7 +54,7 @@ clean_stock_id <- function(stock_name) {
 
 # ENPRO file that I found randomly on the network drives
 enpro_data <- list.files(
-  here("Demographic data"),
+  here("Demographic data", "SEP data"),
   pattern = "(?i)enpro",
   full.names = TRUE
 ) |> 
@@ -193,7 +193,7 @@ convert_to_poh <- function(measurement, input = c("fl", "sl")) {
 
 # Save a list of the data file names
 crest_files <- list.files(
-  here("Demographic data"),
+  here("Demographic data", "CREST data"),
   pattern = "(?i)crest",
   full.names = TRUE
 ) |> 
@@ -279,7 +279,7 @@ crest_data <- crest_files |>
 
 # Escapement data from StAD excel records, collated and cleaned in R by Katie Davidson
 stad_data <- list.files(
-  here("Demographic data"),
+  here("Demographic data", "StAD data"),
   pattern = "(?i)escapement-fsc",
   full.names = TRUE
 ) |> 
@@ -335,7 +335,7 @@ stad_data <- list.files(
 
 # RCH female data from the defunct Biodatabase
 rch_f_data <- list.files(
-  here("Demographic data"),
+  here("Demographic data", "StAD data"),
   pattern = "(?i)female",
   full.names = TRUE
 ) |> 
