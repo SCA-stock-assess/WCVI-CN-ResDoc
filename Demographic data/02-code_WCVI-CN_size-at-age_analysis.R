@@ -7,16 +7,16 @@ pkgs <- c(
 #install.packages(pkgs)
 
 library(readxl)
+library(here)
+library(lme4)
+library(broom.mixed)
+library(merTools) # MASS/dplyr conflict over select(); ensure dplyr::select() takes precedent
 library(tidyverse); theme_set(theme_bw(base_size = 18))
 library(janitor)
 library(fuzzyjoin)
 library(magrittr)
 library(ggridges)
 library(ggpmisc)
-library(here)
-library(lme4)
-library(broom.mixed)
-library(merTools)
 
 
 # Save list of all possible NA strings
@@ -907,7 +907,9 @@ strict_data <- clean_data |>
   mutate(
     .by = c(dataset, resolved_age, year, resolved_stock_id),
     n = n(),
-    dataset = if_else(dataset == "CREST/FOS", "Sport", "Escapement")
+    dataset = if_else(dataset == "CREST/FOS", "Sport", "Escapement") |> 
+      as.factor(),
+    resolved_age = as.character(resolved_age)
   ) |> 
   mutate(
     .by = c(dataset, resolved_age, resolved_stock_id),
@@ -965,14 +967,65 @@ strict_data %>%
 
 # First pass model structure
 mod1 <- lmer(
-  poh_length ~ as.character(resolved_age)*scale(year)*dataset + (scale(year)|resolved_stock_id),
+  poh_length ~ resolved_age*scale(year, scale = FALSE)*dataset + 
+    (scale(year, scale = FALSE)|resolved_stock_id),
+  contrasts = list(resolved_age = 'contr.sum', dataset = 'contr.sum'),
+  REML = FALSE,
+  control = lmerControl(optimizer = "bobyqa"),
   data = strict_data
 )
 # Model converges
 
-summary(mod1)
+# Plot residuals
+plot(mod1)
+plot(mod1, dataset ~ resid(., type = "pearson"))
+# Looks alright
+
+
+# Model summary
+broom.mixed::tidy(mod1, conf.int = TRUE)
 car::Anova(mod1, type = 3)
 
+
+# Estimate changes in length per year by dataset
+vnames <- c("(Intercept)", "scale(year, scale = FALSE)", "scale(year, scale = FALSE):dataset1")
+m <- fixef(mod1)[vnames]
+v <- as.matrix(vcov(mod1))[vnames, vnames]
+
+set.seed(3)
+sampvals <- MASS::mvrnorm(100000, mu = m, Sigma = v) |> 
+  as_tibble() |> 
+  rename(
+    "intercept" = 1,
+    "year" = 2,
+    "diff" = 3
+  ) |> 
+  mutate(
+    val_sport = year + diff,
+    val_escapement = year - diff,
+    slope_sport = val_sport/intercept,
+    slope_escapement = val_escapement/intercept
+  )
+
+sampvals |> 
+  pivot_longer(
+    cols = contains("_"),
+    names_sep = "_",
+    names_to = c("measure", "dataset")
+  ) |> 
+  pivot_wider(
+    names_from = measure,
+    values_from = value
+  ) |> 
+  summarize(
+    .by = dataset,
+    avg_slope = mean(slope),
+    lci = quantile(slope, c(0.025)),
+    uci = quantile(slope, c(0.975))
+  ) |> 
+  # Convert to percentages
+  mutate(across(avg_slope:uci, ~.x*100))
+  
 
 # Dataset of model predictions
 mod1_preds <- strict_data |> 
@@ -981,34 +1034,79 @@ mod1_preds <- strict_data |>
   unnest(pred) 
 
 
-# Plot predictions
-strict_data |> 
+# Split data to plot predictions
+pred_data <- strict_data |> 
   mutate(group = "observed") |> 
-  bind_rows(mutate(mod1_preds, group = "predicted")) %>%
-  split(.$dataset) |> 
-  imap(
-    ~ .x |> 
-      filter(group == "observed") |> 
-      ggplot(aes(year, poh_length)) +
-      facet_grid(resolved_stock_id ~ resolved_age) +
-      #stat_bin2d(binwidth = c(1, 50)) +
-      geom_point(
-        size = 0.5,
-        alpha = 0.2,
-        position = position_jitter(width = 0.25)
-      ) +
-      geom_line(
-        data = filter(.x, group == "predicted"),
-        aes(y = fit),
-        colour = "blue"
-      ) +
-      geom_ribbon(
-        data = filter(.x, group == "predicted"),
-        aes(ymin = lwr, ymax = upr),
-        colour = NA,
-        fill = "blue",
-        alpha = 0.25
-      ) +
-      scale_fill_viridis_c(option = "rocket") +
-      labs(title = .y)
+  bind_rows(mutate(mod1_preds, group = "predicted"))  |> 
+  # Fix up names for Facet titles
+  mutate(
+    resolved_age = paste("Age", resolved_age),
+    resolved_stock_id = str_to_title(resolved_stock_id),
+    y_axis = if_else(dataset == "Sport", "Nose-fork length (mm)", "POH length (mm)")
+  ) |> 
+  nest(.by = c(dataset, y_axis, group)) |> 
+  pivot_wider(
+    names_from = group,
+    values_from = data
+  ) |> 
+  rowwise() |> 
+  mutate(
+    ggplot = list(
+      observed |> 
+        ggplot(aes(year, poh_length)) +
+        facet_grid(resolved_stock_id ~ resolved_age) +
+        # Couple options to deal with overplotting
+        #stat_bin2d(binwidth = c(1, 50)) +
+        #stat_binhex(binwidth = c(1, 75)) +
+         geom_point(
+           size = 0.5,
+           alpha = 0.2,
+           position = position_jitter(width = 0.25)
+         ) +
+        geom_line(
+          data = predicted,
+          aes(y = fit),
+          colour = "blue"
+        ) +
+        geom_ribbon(
+          data = predicted,
+          aes(ymin = lwr, ymax = upr),
+          colour = NA,
+          fill = "blue",
+          alpha = 0.25
+        ) +
+        scale_fill_viridis_c(
+          option = "rocket",
+          limits = c(0, NA)
+          ) +
+        labs(
+          title = paste("Data source:", dataset),
+          y = y_axis
+        ) +
+        theme(axis.text.x = element_text(angle = 45, hjust = 1))
+    )
   )
+
+
+# Show plots
+(pred_plots <- pull(pred_data, ggplot) |> 
+  set_names(unique(pred_data$dataset))
+)
+
+
+# Save plots
+pred_plots |> 
+  iwalk(
+    ~ggsave(
+      .x,
+      filename = here(
+        "Demographic data",
+        "R plots",
+        paste0("LMM_pred_size-at-age_", .y, ".png")
+      ),
+      height = 8,
+      width = 8,
+      units = "in"
+    )
+  )
+
