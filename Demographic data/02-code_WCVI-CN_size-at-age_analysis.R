@@ -1007,6 +1007,7 @@ sampvals <- MASS::mvrnorm(100000, mu = m, Sigma = v) |>
     slope_escapement = val_escapement/intercept
   )
 
+# Summarize sample vals to show estimated % change in lengths over time
 sampvals |> 
   pivot_longer(
     cols = contains("_"),
@@ -1023,8 +1024,8 @@ sampvals |>
     lci = quantile(slope, c(0.025)),
     uci = quantile(slope, c(0.975))
   ) |> 
-  # Convert to percentages
-  mutate(across(avg_slope:uci, ~.x*100))
+  # Convert to percentages, and use per-decade values
+  mutate(across(avg_slope:uci, ~.x*100*10))
   
 
 # Dataset of model predictions
@@ -1102,7 +1103,7 @@ pred_plots |>
       filename = here(
         "Demographic data",
         "R plots",
-        paste0("LMM_pred_size-at-age_", .y, ".png")
+        paste0("R-plot_LMM_pred_size-at-age_", .y, ".png")
       ),
       height = 8,
       width = 8,
