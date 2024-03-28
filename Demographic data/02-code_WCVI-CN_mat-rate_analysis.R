@@ -33,6 +33,16 @@ out_data <- list.files(
   # )
 
 
+# Recent 9 year average maturation rates 
+out_data |> 
+  filter(max(brood_year) - brood_year < 10) |> 
+  group_by(age) |> 
+  summarize(avg_mat_rate = mean(mat_rate))
+
+
+# Recent 9 year average maturity at age by brood year
+
+
 
 # Plot --------------------------------------------------------------------
 
