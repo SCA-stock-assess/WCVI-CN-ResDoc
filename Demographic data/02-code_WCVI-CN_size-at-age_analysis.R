@@ -981,6 +981,8 @@ plot(mod1)
 plot(mod1, dataset ~ resid(., type = "pearson"))
 # Looks alright
 
+# Check for temporal autocorrelation??
+
 
 # Model summary
 broom.mixed::tidy(mod1, conf.int = TRUE)
@@ -1052,6 +1054,16 @@ pred_data <- strict_data |>
   ) |> 
   rowwise() |> 
   mutate(
+    sum_data = list(
+      summarize(
+        .data = observed,
+        .by = c(resolved_age, resolved_stock_id, year),
+        mean = mean(poh_length),
+        lci = quantile(poh_length, 0.025),
+        uci = quantile(poh_length, 0.975),
+        n = n()
+      )
+    ),
     ggplot = list(
       observed |> 
         ggplot(aes(year, poh_length)) +
@@ -1059,11 +1071,20 @@ pred_data <- strict_data |>
         # Couple options to deal with overplotting
         #stat_bin2d(binwidth = c(1, 50)) +
         #stat_binhex(binwidth = c(1, 75)) +
-         geom_point(
-           size = 0.5,
-           alpha = 0.2,
-           position = position_jitter(width = 0.25)
-         ) +
+        geom_pointrange(
+          data = sum_data,
+          aes(
+            y = mean,
+            ymin = lci,
+            ymax = uci,
+            size = n
+          )
+        ) +
+        # geom_point(
+        #   size = 0.5,
+        #   alpha = 0.2,
+        #   position = position_jitter(width = 0.25)
+        # ) +
         geom_line(
           data = predicted,
           aes(y = fit),
@@ -1079,7 +1100,8 @@ pred_data <- strict_data |>
         scale_fill_viridis_c(
           option = "rocket",
           limits = c(0, NA)
-          ) +
+        ) +
+        scale_size_continuous(range = c(0.1, 1)) +
         labs(
           title = paste("Data source:", dataset),
           y = y_axis
