@@ -109,7 +109,7 @@ Heq_holt <- function(alpha, beta, U) {
 
 
 # Define range of harvest rates
-Ueq <- tibble(Ueq = seq(0, 1, by = 0.05))
+Ueq <- tibble(Ueq = seq(0, 1, by = 0.01))
 
 
 # Add harvest rates to data and execute calculations
@@ -220,7 +220,7 @@ holt_params |>
   summarize(
     .by = c(Ueq),
     across(Seq:Heq, sum)
-  ) |>
+  ) |> 
   ggplot(aes(x = Seq, y = Heq)) +
   geom_line(colour = "blue")
 
