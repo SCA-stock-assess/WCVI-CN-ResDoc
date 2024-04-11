@@ -228,7 +228,8 @@ quadLabs <- data.frame(
         hjust = hjust
       )
     ) +
-    coord_cartesian(
+    coord_fixed(
+      ratio = 1,
       xlim = c(0,2),
       ylim = c(0,2),
       expand = FALSE
@@ -287,7 +288,7 @@ quadLabs <- data.frame(
 ggsave(
   here("Kobe plot", "R-PLOT_WCVI_CN_Nat_Kobe.png"),
   filled_kobe,
-  height = 5,
+  height = 7,
   width = 7,
   units = "in"
 )
@@ -360,7 +361,8 @@ kobe_df <- kobe_data_alt
         hjust = hjust
       )
     ) +
-    coord_cartesian(
+    coord_fixed(
+      ratio = 1,
       xlim = c(0,2),
       ylim = c(0,2),
       expand = FALSE
@@ -380,7 +382,7 @@ kobe_df <- kobe_data_alt
 ggsave(
   here("Kobe plot", "R-PLOT_WCVI_CN_Equilibrium_Kobe.png"),
   eq_kobe,
-  height = 5,
+  height = 7,
   width = 7,
   units = "in"
 )
