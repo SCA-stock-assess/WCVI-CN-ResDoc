@@ -28,43 +28,6 @@ productivity <- tribble(
   )
 
 
-# Load RP data ------------------------------------------------------------
-
-
-# Using RPs from 3 different methods
-rp_data <- list.files(
-  here("Kobe plot"),
-  pattern = "(?i)bootstrappedRPs",
-  full.names = TRUE
-) |> 
-  read_excel(sheet = "wcviCK-BootstrappedRPs_ExtInd_R", range = cell_cols("B:J")) |> 
-  clean_names() |> 
-  filter(!str_detect(stock, "\\*")) |> # Remove rows flagged with asterisks (follow up w/Wilf on these)
-  pivot_wider(
-    names_from = rp,
-    values_from = value:upr,
-    names_sep = "_"
-  ) |> 
-  rename_with(~str_to_lower(str_replace(.x, "value_", "median_"))) |> 
-  left_join(productivity) |> 
-  mutate(
-    #beta = mean_log_a/median_srep,
-    umsy = beta*median_smsy,
-    recruits_at_0.85smsy = alpha*0.85*median_smsy*(exp(-beta*0.85*median_smsy))
-  ) |> 
-  # Clean up river names
-  mutate(stock = make_clean_names(stock, allow_dupes = TRUE))
-
-
-# Are any stocks duplicated across methods?
-rp_data |> 
-  filter(
-    .by = c(stock, method),
-    n() > 1
-  )
-
-  
-
 # Define functions for calculating Seq and Heq ----------------------------
 
 
@@ -105,98 +68,11 @@ Heq_holt <- function(alpha, beta, U) {
 }
 
 
-# Apply functions to WCVI data --------------------------------------------
+# Simple example with Carrie's method -------------------------------------
 
 
 # Define range of harvest rates
 Ueq <- tibble(Ueq = seq(0, 0.95, by = 0.05))
-
-
-# Add harvest rates to data and execute calculations
-eq_data <- rp_data |> 
-  crossing(Ueq) |> 
-  rowwise() |> 
-  mutate(
-     across(
-       c(median_smsy, lwr_smsy, upr_smsy), 
-       ~Seq(Smsy = .x, Umsy = umsy, Ueq = Ueq),
-       .names = "{paste0('Seq_', str_remove_all(.col, '_smsy'))}"
-       ),
-     across(
-       contains("Seq"),
-       ~Heq(Ueq = Ueq, Seq = .x),
-       .names = "{paste0('Heq_', str_remove_all(.col, 'Seq_'))}"
-     )
-  ) |> 
-  ungroup() |> 
-  # Calculate aggregate values for the SMU
-  mutate(
-    .by = c(Ueq, method),
-    across(
-      matches("(S|H)eq"), 
-      sum, 
-      .names = "agg_{.col}"
-    ),
-    agg_ER_median = agg_Heq_median / (agg_Seq_median + agg_Heq_median),
-    agg_ER_lwr = agg_Heq_lwr/(agg_Seq_median + agg_Heq_lwr),
-    agg_ER_upr = agg_Heq_upr/(agg_Seq_median + agg_Heq_upr),
-    num_stocks_exceed_umsy_median = sum(agg_ER_median > umsy),
-    num_stocks_exceed_umsy_lwr = sum(agg_ER_lwr > umsy),
-    num_stocks_exceed_umsy_upr = sum(agg_ER_upr > umsy)
-  )
-
-
-# Take a stab at plot
-eq_plot <- function(var) {
-  
-  data <- eq_data |> 
-    filter(method == var) |> 
-    distinct(Ueq, pick(matches("agg_(H|S)eq")), pick(matches("num_stocks_exceed"))) |> 
-    mutate(across(matches("(H|S)eq"), ~if_else(.x < 0, 0, .x)))
-  
-  
-  trans_ratio <- max(data$agg_Heq_upr)/max(data$num_stocks_exceed_umsy_median)
-  
-  
-  plot <- ggplot(data, aes(x = agg_Seq_median, y = agg_Heq_median)) +
-    geom_line(colour = "blue") +
-    geom_ribbon(
-      aes(ymin = agg_Heq_lwr, ymax = agg_Heq_upr),
-      fill = "blue",
-      alpha = 0.3
-    ) +
-    geom_line(
-      aes(y = num_stocks_exceed_umsy_median * trans_ratio), 
-      colour = "red"
-    ) +
-    geom_ribbon(
-      aes(
-        ymin = num_stocks_exceed_umsy_lwr * trans_ratio, 
-        ymax = num_stocks_exceed_umsy_upr * trans_ratio
-      ),
-      fill = "red",
-      alpha = 0.3
-    ) +
-    scale_y_continuous(
-      sec.axis = sec_axis(
-        transform = ~./trans_ratio,
-        name = "Number of stocks where\naggregate ER > Umsy"
-      )
-    ) +
-    labs(title = var)
-  
-  return(plot)
-}
-
-
-# Plots for each method
-set_names(unique(eq_data$method)) |> 
-  map(~eq_plot(var = .x))
-
-
-
-
-# Simple example with Carrie's method -------------------------------------
 
 
 # Get data summarized by CU
@@ -335,3 +211,126 @@ ggsave(
   height = 5,
   width = 7, units = "in"
 )
+
+
+# Old stuff probably no longer needed -------------------------------------
+
+
+# Using RPs from 3 different methods
+rp_data <- list.files(
+  here("Kobe plot"),
+  pattern = "(?i)bootstrappedRPs",
+  full.names = TRUE
+) |> 
+  read_excel(sheet = "wcviCK-BootstrappedRPs_ExtInd_R", range = cell_cols("B:J")) |> 
+  clean_names() |> 
+  filter(!str_detect(stock, "\\*")) |> # Remove rows flagged with asterisks (follow up w/Wilf on these)
+  pivot_wider(
+    names_from = rp,
+    values_from = value:upr,
+    names_sep = "_"
+  ) |> 
+  rename_with(~str_to_lower(str_replace(.x, "value_", "median_"))) |> 
+  left_join(productivity) |> 
+  mutate(
+    #beta = mean_log_a/median_srep,
+    umsy = beta*median_smsy,
+    recruits_at_0.85smsy = alpha*0.85*median_smsy*(exp(-beta*0.85*median_smsy))
+  ) |> 
+  # Clean up river names
+  mutate(stock = make_clean_names(stock, allow_dupes = TRUE))
+
+
+# Are any stocks duplicated across methods?
+rp_data |> 
+  filter(
+    .by = c(stock, method),
+    n() > 1
+  )
+
+
+
+# Add harvest rates to data and execute calculations
+eq_data <- rp_data |> 
+  crossing(Ueq) |> 
+  rowwise() |> 
+  mutate(
+    across(
+      c(median_smsy, lwr_smsy, upr_smsy), 
+      ~Seq(Smsy = .x, Umsy = umsy, Ueq = Ueq),
+      .names = "{paste0('Seq_', str_remove_all(.col, '_smsy'))}"
+    ),
+    across(
+      contains("Seq"),
+      ~Heq(Ueq = Ueq, Seq = .x),
+      .names = "{paste0('Heq_', str_remove_all(.col, 'Seq_'))}"
+    )
+  ) |> 
+  ungroup() |> 
+  # Calculate aggregate values for the SMU
+  mutate(
+    .by = c(Ueq, method),
+    across(
+      matches("(S|H)eq"), 
+      sum, 
+      .names = "agg_{.col}"
+    ),
+    agg_ER_median = agg_Heq_median / (agg_Seq_median + agg_Heq_median),
+    agg_ER_lwr = agg_Heq_lwr/(agg_Seq_median + agg_Heq_lwr),
+    agg_ER_upr = agg_Heq_upr/(agg_Seq_median + agg_Heq_upr),
+    num_stocks_exceed_umsy_median = sum(agg_ER_median > umsy),
+    num_stocks_exceed_umsy_lwr = sum(agg_ER_lwr > umsy),
+    num_stocks_exceed_umsy_upr = sum(agg_ER_upr > umsy)
+  )
+
+
+# Take a stab at plot
+eq_plot <- function(var) {
+  
+  data <- eq_data |> 
+    filter(method == var) |> 
+    distinct(Ueq, pick(matches("agg_(H|S)eq")), pick(matches("num_stocks_exceed"))) |> 
+    mutate(across(matches("(H|S)eq"), ~if_else(.x < 0, 0, .x)))
+  
+  
+  trans_ratio <- max(data$agg_Heq_upr)/max(data$num_stocks_exceed_umsy_median)
+  
+  
+  plot <- ggplot(data, aes(x = agg_Seq_median, y = agg_Heq_median)) +
+    geom_line(colour = "blue") +
+    geom_ribbon(
+      aes(ymin = agg_Heq_lwr, ymax = agg_Heq_upr),
+      fill = "blue",
+      alpha = 0.3
+    ) +
+    geom_line(
+      aes(y = num_stocks_exceed_umsy_median * trans_ratio), 
+      colour = "red"
+    ) +
+    geom_ribbon(
+      aes(
+        ymin = num_stocks_exceed_umsy_lwr * trans_ratio, 
+        ymax = num_stocks_exceed_umsy_upr * trans_ratio
+      ),
+      fill = "red",
+      alpha = 0.3
+    ) +
+    scale_y_continuous(
+      sec.axis = sec_axis(
+        transform = ~./trans_ratio,
+        name = "Number of stocks where\naggregate ER > Umsy"
+      )
+    ) +
+    labs(title = var)
+  
+  return(plot)
+}
+
+
+# Plots for each method
+set_names(unique(eq_data$method)) |> 
+  map(~eq_plot(var = .x))
+
+
+
+
