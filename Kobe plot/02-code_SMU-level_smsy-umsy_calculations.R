@@ -109,7 +109,7 @@ Heq_holt <- function(alpha, beta, U) {
 
 
 # Define range of harvest rates
-Ueq <- tibble(Ueq = seq(0, 1, by = 0.01))
+Ueq <- tibble(Ueq = seq(0, 0.95, by = 0.05))
 
 
 # Add harvest rates to data and execute calculations
@@ -200,27 +200,138 @@ set_names(unique(eq_data$method)) |>
 
 
 # Get data summarized by CU
-holt_params <- rp_data |> 
-  filter(method == "RunRecon") |>
-  summarize(
-    .by = c(cu, mean_log_a, sd_log_a, beta),
-    across(matches("median_s.{3}"), sum)
-  ) |> 
-  crossing(Ueq) |> 
+holt_params <- productivity |> 
+  select(1:3) |> 
+  rowwise() |> 
   mutate(
-    Seq = Seq_holt(alpha = mean_log_a, beta = beta, U = Ueq),
-    Heq = Heq_holt(alpha = mean_log_a, beta = beta, U = Ueq),
-    across(Seq:Heq, ~if_else(.x < 0, 0, .x)),
+    data = list(
+      rnorm(10000, mean = mean_log_a, sd = 0.5) |> 
+        as_tibble_col(column_name = "log_a") |>  
+        filter(log_a > 0) |> 
+        mutate(beta = log_a/srep) |> 
+        crossing(Ueq) |> 
+        mutate(
+          Seq = Seq_holt(alpha = log_a, beta = beta, U = Ueq),
+          Heq = Heq_holt(alpha = log_a, beta = beta, U = Ueq),
+          #across(Seq:Heq, ~if_else(.x < 0, 0, .x))
+        )
+    )  
   )
 
 
-# Plot
-holt_params |> 
-  filter(!Ueq == 1) |> 
+# Calculate CU-level Umsy
+umsy_vals <- productivity |> 
+  mutate(umsy = beta * ((mean_log_a*(0.5-0.07*mean_log_a))/beta)) |> 
+  pull(umsy)
+
+
+# Unpack and summarize data
+eq_sum_data <- holt_params |> 
+  unnest(data) |> 
+  #filter(!if_any(Seq:Heq, ~(is.na(.x) | is.infinite(.x)))) |> 
+  mutate(
+    .by = cu,
+    id = row_number(),
+    across(Seq:Heq, ~if_else(.x < 0, 0, .x))
+  ) |> 
   summarize(
-    .by = c(Ueq),
+    .by = c(id, Ueq),
     across(Seq:Heq, sum)
   ) |> 
-  ggplot(aes(x = Seq, y = Heq)) +
-  geom_line(colour = "blue")
+  summarize(
+    .by = Ueq,
+    Seq = median(Seq),
+    Heq_mid = median(Heq),
+    Heq_lwr = quantile(Heq, 0.25),
+    Heq_upr = quantile(Heq, 0.75)
+  ) |> 
+  mutate(
+    umsy = list(umsy_vals),
+    num_cu_exceed_umsy = map2(
+      .x = Ueq,
+      .y = umsy,
+      ~ifelse(.x > .y, 1, 0)
+    ) |> 
+      map(sum) |> 
+      unlist()
+  )
 
+  
+# Calculate secondary y axis transformation
+ratio <- max(eq_sum_data$Heq_upr)/max(eq_sum_data$num_cu_exceed_umsy)
+
+
+# label Smsy
+smsy_lab <- tibble(
+  Heq_mid = max(eq_sum_data$Heq_mid),
+  label = eq_sum_data$Seq[eq_sum_data$Heq_mid == max(eq_sum_data$Heq_mid)]
+)
+
+
+# Plot summarized data
+(eq_plot <- ggplot(eq_sum_data, aes(x = Seq, y = Heq_mid)) +
+  geom_line(
+    colour = "blue",
+    linewidth = 1
+  ) +
+  geom_ribbon(
+    aes(ymin = Heq_lwr, ymax = Heq_upr),
+    fill = "blue",
+    alpha = 0.3
+  ) +
+  geom_line(
+    aes(y = num_cu_exceed_umsy*ratio),
+    colour = "red",
+    linewidth = 1
+  ) +
+  annotate(
+    "segment",
+    x = smsy_lab$label,
+    y = 0, 
+    yend = smsy_lab$Heq_mid,
+    lty = 2,
+    colour = "grey50",
+    linewidth = 0.75
+  ) +
+  annotate(
+    "text",
+    x = smsy_lab$label + 1e3,
+    y = 1000,
+    colour = "grey50",
+    label = paste0("Seq = ", round(smsy_lab$label, 0)),
+    angle = 270,
+    hjust = 1
+  ) +
+  scale_x_continuous(
+    labels = scales::comma,
+    expand = expansion(mult = c(0, 0)),
+    sec.axis = sec_axis(
+      transform = ~1-(./max(.)),
+      labels = scales::percent,
+      name = "Aggregate equilibrium ER",
+      breaks = seq(0, 1, by = 0.2)
+    )
+  ) +
+  scale_y_continuous(
+    labels = scales::comma,
+    expand = expansion(mult = c(0, 0.05)),
+    sec.axis = sec_axis(
+      transform = ~./ratio,
+      name = "Number of CUs where agg. ER > Umsy"
+    )
+  ) +
+  labs(
+    y = "Aggregate equilibrium harvest",
+    x = "Aggregate equilibrium spawners"
+  ) +
+  theme_bw()
+)
+
+
+# Save plot
+ggsave(
+  eq_plot,
+  filename = here("Kobe plot", "R-PLOT_equilibrium_harvest_curves.png"),
+  height = 5,
+  width = 7, units = "in"
+)
