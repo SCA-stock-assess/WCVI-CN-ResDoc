@@ -21,16 +21,18 @@ library(here)
 
 # Escapement time series
 indicator_esc <- read_xlsx(
-  here("Kobe plot", "01-data_HOLT SR parameters KOBE PLOT.xlsx"),
-  sheet = "Raw KOBE data"
+  here("Kobe plot", "01-data_FWA table update version 4 April17.xlsx"),
+  sheet = "RiverEscData (2)",
+  skip = 2
   ) |> 
   clean_names() |> 
-  select(1:17) |> 
-  pivot_longer(
-    2:last_col(),
-    names_to = "river",
-    values_to = "escapement"
-  )
+  select(cu, indicator, watershed, stream_name, brood_year, spawners, natural_origin_spawners) |> 
+  rename(
+    "river" = stream_name,
+    "escapement" = spawners,
+    "year" = brood_year
+  ) |> 
+  mutate(river = make_clean_names(river, allow_dupes = TRUE))
 
 
 # Estimated Robertson CN exploitation rate time series
@@ -45,66 +47,47 @@ rch_er <- read_xlsx(
 
 # Reference points data set
 indicator_rp <- read_xlsx(
-  here("Kobe plot", "01-data_HOLT SR parameters KOBE PLOT.xlsx"),
-  sheet = "Raw Holt RP data"
+  here("Kobe plot", "01-data_FWA table update version 4 April17.xlsx"),
+  sheet = "RiverEscData",
+  skip = 2
 ) |> 
   clean_names() |> 
+  select(cu, indicator, watershed, stream_name, matches("life_cycle|lc")) |> 
+  separate_wider_regex(
+    cols = contains("range"),
+    patterns = c("\\(", lwr = ".*", "-", upr = ".*", "\\)"),
+    names_sep = "_"
+  ) |> 
+  rename_with(
+    ~str_remove_all(.x, "(?<=s.{3}_).*(?=upr|lwr)") |> 
+      str_remove_all("_life_cycle")
+  ) |> 
+  rename("river" = stream_name) |> 
   # Add SR parameters
   mutate(
-    smsy_divide_srep = smsy_median/srep_median,
+    smsy_divide_srep = smsy/srep,
     alpha = exp((0.5-smsy_divide_srep)/0.07),
-    beta = log(alpha)/srep_median,
+    beta = log(alpha)/srep,
     umsy = (0.5*log(alpha)) - (0.07*(log(alpha))^2),
-    recruits_at_0.85smsy = alpha*0.85*smsy_median*(exp(-beta*0.85*smsy_median))
+    recruits_at_0.85smsy = alpha*0.85*smsy*(exp(-beta*0.85*smsy))
   ) |> 
   # Clean up river names
   mutate(river = make_clean_names(river))
 
 
-# Select rivers to include in KOBE plot
-rivers <- c(
-  "artlish",
-  "burman",
-  #"conuma",
-  "gold",
-  "kaouk",
-  "leiner",
-  "tahsis",
-  "tahsish",
-  "zeballos",
-  "bedwell",
-  #"cypre",
-  "megin",
-  "moyeha",
-  "nahmint",
-  #"nitinat",
-  "sarita",
-  #"somass_stamp_sproat",
-  "tranquil",
-  "san_juan",
-  "colonial_cayeagle",
-  #"east",
-  #"goodspeed",
-  #"keith",
-  #"klaskish",
-  #"mahatta",
-  #"washlawlis",
-  "marble"
-)
-
-
 # Make dataframe for KOBE plot
 kobe_data <- indicator_esc |> 
   filter(
-    river %in% rivers,
+    indicator %in% c("Ind7", "Ind17"),
     !is.na(escapement)
   ) |> 
-  left_join(select(.data = indicator_rp, river, umsy, smsy_median)) |> 
+  left_join(select(.data = indicator_rp, river, umsy, smsy)) |> 
+  mutate(river = str_remove_all(river, "(?<=_).*") |> str_remove_all("_")) |> 
   summarize(
     .by = year,
     escapement = sum(escapement),
     umsy = mean(umsy),
-    smsy = sum(smsy_median),
+    smsy = sum(smsy),
     rivers = paste0(river, collapse = "; ")
   ) |> 
   left_join(rch_er) |> 
@@ -128,15 +111,17 @@ kobe_data <- indicator_esc |>
   ) |> 
   relocate(rivers, .after = last_col()) |> # Move "rivers" list to the end
   # Remove years with missing data
-  filter(!if_any(!year, is.na)) 
+  filter(!if_any(!year, is.na)) |> 
+  arrange(year)
 
 
 # Alternate Kobe data using the equilibrium harvest rate approach
 kobe_data_alt <- indicator_esc |> 
   filter(
-    river %in% rivers,
+    indicator %in% c("Ind7", "Ind17"),
     !is.na(escapement)
   ) |> 
+  mutate(river = str_remove_all(river, "(?<=_).*") |> str_remove_all("_")) |>
   summarize(
     .by = year,
     escapement = sum(escapement)
@@ -163,7 +148,8 @@ kobe_data_alt <- indicator_esc |>
     )
   ) |> 
   # Remove years with missing data
-  filter(!if_any(!year, is.na)) 
+  filter(!if_any(!year, is.na))  |> 
+  arrange(year)
 
 
 # Save the output data
@@ -306,25 +292,25 @@ ggsave(
 
 
 # Animated version
-(animated_kobe <- base_kobe +
-    geom_path(aes(alpha = year)) +
-    geom_point(
-      colour = kobe_data$colour,
-      size = 3,
-    ) +
-    scale_alpha_continuous(range = c(0.025,0.8)) +
-    transition_reveal(along = year, keep_last = T) +
-    labs(subtitle = 'Year: {frame_along}') 
-)
-
-# Animate it
-anim <- animate(animated_kobe, duration = 60, fps = 20, 
-                width = 13.3333, height = 7.5, units = "in", 
-                res = 150, # Resolution is in pixels-per-inch (ppi)
-                renderer = gifski_renderer(), 
-                end_pause = 20*10) # End pause is in frames: 20 frames * 10 = 10 seconds
-
-anim_save(here("Kobe plot", "KOBE_ts_animation.gif"), animation = anim)
+# (animated_kobe <- base_kobe +
+#     geom_path(aes(alpha = year)) +
+#     geom_point(
+#       colour = kobe_data$colour,
+#       size = 3,
+#     ) +
+#     scale_alpha_continuous(range = c(0.025,0.8)) +
+#     transition_reveal(along = year, keep_last = T) +
+#     labs(subtitle = 'Year: {frame_along}') 
+# )
+# 
+# # Animate it
+# anim <- animate(animated_kobe, duration = 60, fps = 20, 
+#                 width = 13.3333, height = 7.5, units = "in", 
+#                 res = 150, # Resolution is in pixels-per-inch (ppi)
+#                 renderer = gifski_renderer(), 
+#                 end_pause = 20*10) # End pause is in frames: 20 frames * 10 = 10 seconds
+# 
+# anim_save(here("Kobe plot", "KOBE_ts_animation.gif"), animation = anim)
 
 
 
@@ -372,7 +358,8 @@ kobe_dfs <- list("RR" = kobe_data_alt, "LifeCycle" = kobe_data)
           data = filter(.x, year== min(.x$year)|year== max(.x$year)),
           colour = "red",
           shape = 21,
-          size = 3
+          size = 3,
+          stroke = 1.25
         ) +
         geom_text(
           data = quadLabs, 
