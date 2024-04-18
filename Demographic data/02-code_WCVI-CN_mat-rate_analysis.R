@@ -1,4 +1,3 @@
-
 # Load packages -----------------------------------------------------------
 
 pkgs <- c("tidyverse", "here", "readxl", "janitor")
@@ -33,14 +32,13 @@ out_data <- list.files(
   # )
 
 
-# Recent 9 year average maturation rates 
+# Recent 12 year average maturation rates 
 out_data |> 
-  filter(max(brood_year) - brood_year < 10) |> 
+  filter(max(brood_year) - brood_year < 13) |> 
   group_by(age) |> 
   summarize(avg_mat_rate = mean(mat_rate))
 
 
-# Recent 9 year average maturity at age by brood year
 
 
 
@@ -69,7 +67,7 @@ out_data |>
      y = "Maturation rate",
      x = "Brood year",
      colour = "Age\n(years)",
-     size = "Cohort size\n(estimated CWTs)"
+     size = "Estimated CWTs"
    ) +
    theme_minimal()
 )
