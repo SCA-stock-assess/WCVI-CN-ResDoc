@@ -327,6 +327,11 @@ kobe_dfs <- list("RR" = kobe_data_alt, "LifeCycle" = kobe_data) |>
     ggplot(aes(x, y)) +
     facet_wrap(~method, nrow = 1) +
     #draw data and error bars on final year
+<<<<<<< HEAD
+=======
+    geom_path(aes(alpha = year)) + #if you want to connect the dots
+    geom_point(aes(color = year), size=3) +
+>>>>>>> 7972bab2df9aa708184f91f77f0da8e708820b1b
     # geom_errorbar(data = filter(kobe_df, year == max(kobe_df$year)),
     #               aes(x = S_Smsy, ymin = U_Umsy_LCI, ymax = U_Umsy_UCI), width = 0) +
     # geom_errorbarh(data = filter(kobe_df, year == max(kobe_df$year)),
@@ -338,8 +343,11 @@ kobe_dfs <- list("RR" = kobe_data_alt, "LifeCycle" = kobe_data) |>
     #add labels to 80% Smsy, first and last year of data
     # annotate("text", x = 0.8, y = .4, hjust = 0,
     #          label = expression(italic(paste("80%",S)[MSY]))) +
+<<<<<<< HEAD
     geom_path(aes(alpha = year)) + #if you want to connect the dots
     geom_point(aes(color = year), size=3) +
+=======
+>>>>>>> 7972bab2df9aa708184f91f77f0da8e708820b1b
     annotate(
       "rect", 
       xmin = 0.8, 
