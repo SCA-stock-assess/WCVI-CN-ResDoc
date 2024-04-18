@@ -1,0 +1,88 @@
+---
+title: "FSAR 4 Panel"
+author: "John Gray"
+date: "2024-03-21"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(openxlsx)
+library(tidyverse)
+library(patchwork)
+library(scales)
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(ggpubr)
+```
+
+
+```{r}
+SMU_DAT <- read.csv("PATH")
+```
+
+    geom_hline(yintercept = 33.5, linetype = "dashed", size = 0.8, colour = "#01665e") + 
+    geom_hline(yintercept = 65.3, linetype = "dashed", size = 0.8, colour = '#d01c8b') +
+    
+# Plots
+## 4 Panel Plot - SMU
+```{r}
+# Code for the FSAR 4 panel plots
+
+## Vector of SMUs/CU 
+smu_lst <- unique(SMU_DAT$smu)
+
+for(smu in smu_lst) {
+  
+  smudat <- SMU_DAT[SMU_DAT$smu == smu, ]
+  
+    catch_ryear <- smudat %>%
+      ggplot(aes(x = year, y = catch/1000, na.rm = TRUE)) +
+        geom_line() +
+        scale_x_continuous(breaks = seq(from = YYYY, to = YYYY, by = X)) +
+        scale_y_continuous(breaks = seq(from = 0, to = max(smudat$catch, na.rm = TRUE)/1000, by = 50), expand = c(0, 0), limits = c(0,NA)) +
+        labs(y = "Aggregate Wild Catch (1000s)", x = "") +
+        theme_classic() +
+        theme(axis.text = element_text(size = 8), axis.title = element_text(size = 9))
+  
+    esc_ryear <- smudat %>%
+      ggplot(aes(x = year)) +
+        geom_line(aes(y = escapement/1000, na.rm = TRUE), linewidth = 0.5) +
+#       geom_hline(yintercept = ___, linetype = "dashed", size = 0.8, colour = "#01665e") + # A marker for upper reference points - colour scheme matching ice cream plots
+#       geom_hline(yintercept = ___, linetype = "dashed", size = 0.8, colour = "#d01c8b") + # A marker for lower reference points - colour scheme matching ice cream plots
+        scale_x_continuous(breaks = seq(from = YYYY, to = YYYY, by = X)) +
+        scale_y_continuous(breaks = seq(from = 0, to = max(smudat$escapement, na.rm = TRUE)/1000, by = 5), expand = c(0, 0), limits = c(0,NA)) +
+        labs(y = "Aggregate Wild Spawner \nAbundance (1000s)", x = "") +
+        theme_classic() +
+        theme(axis.text = element_text(size = 8), axis.title = element_text(size = 9))
+
+    ER_ryear <- smudat %>%
+      ggplot(aes(x = year)) +
+        geom_line(aes(y = exp_rate, na.rm = TRUE), linewidth = 0.5) +
+#       geom_hline(yintercept = ___, linetype = "dashed", size = 0.8, colour = "#01665e") + # A marker for ER cap that may/may not exist for the SMU
+        scale_x_continuous(breaks = seq(from = YYYY, to = YYYY, by = X)) +
+        scale_y_continuous(breaks = seq(from = 0, to = 1, by = 0.1), expand = c(0, 0), limits = c(0, NA)) +
+        labs(y = "Aggregate Exploitation Rate (ER)", x = "Return Year") +
+        theme_classic() +
+        theme(axis.text = element_text(size = 8), axis.title = element_text(size = 9))
+
+    recruits_ryear <- smudat %>%
+      ggplot(aes(x = year)) +
+        geom_line(aes(y = recruits/1000, na.rm = TRUE), linewidth = 0.5) +
+#       geom_hline(yintercept = ___, linetype = "dashed", size = 0.8, colour = "#01665e") + # A marker for ER cap that may exist for the SMU
+        scale_x_continuous(breaks = seq(from = YYYY, to = YYYY, by = X)) +
+        scale_y_continuous(breaks = seq(from = 0, to = max(smudat$recruits, na.rm = TRUE)/1000, by = 5), expand = c(0, 0), limits = c(0, NA)) +
+        labs(y = "Aggregate Recruitment (1000s)", x = "Return Year") +
+        theme_classic() +
+        theme(axis.text = element_text(size = 8), axis.title = element_text(size = 9))
+
+  ggarrange(catch_ryear, esc_ryear, ER_ryear, recruits_ryear, nrow = 2, ncol = 2, align = "hv", common.legend = TRUE)
+  
+  ggsave(paste(smu, "_4_Panel.jpg", sep = ""), path = "____", units = "in", height = 5, width = 7.5, dpi = 500)
+  
+}
+
+
+```
+
