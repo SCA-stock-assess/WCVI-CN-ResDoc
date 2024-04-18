@@ -185,7 +185,7 @@ smsy_lab <- tibble(
       transform = ~1-(./max(.)),
       labels = scales::percent,
       name = "Aggregate equilibrium ER",
-      breaks = seq(0, 1, by = 0.2)
+      breaks = seq(0, 0.95, by = 0.2)
     )
   ) +
   scale_y_continuous(
