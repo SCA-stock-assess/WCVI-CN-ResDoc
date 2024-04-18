@@ -2,11 +2,12 @@
 
 pkgs <- c(
   'tidyverse','RColourBrewer','gganimate','ggrepel',
-  'readxl', 'writexl','janitor', 'here'
+  'readxl', 'writexl','janitor', 'here', "ggtext"
 )
 #install.packages(pkgs)
 
 library(tidyverse); theme_set(theme_light(base_size = 18))
+library(ggtext)
 library(janitor)
 library(RColorBrewer)
 library(gganimate)
@@ -175,6 +176,16 @@ writexl::write_xlsx(
 )
 
 
+# Save alternate output data
+writexl::write_xlsx(
+  select(.data = kobe_data_alt, -colour, -quadrant),
+  here(
+    "Kobe plot", 
+    paste0("R-OUT_Kobe_plot_raw_data_alternate_", Sys.Date(), ".xlsx")
+  )
+)
+
+
 # Plots -------------------------------------------------------------------
 
 
@@ -319,71 +330,89 @@ anim_save(here("Kobe plot", "KOBE_ts_animation.gif"), animation = anim)
 
 # Code from FSAR group ----------------------------------------------------
 
-kobe_df <- kobe_data_alt
+
+kobe_dfs <- list("RR" = kobe_data_alt, "LifeCycle" = kobe_data)
 
 
-(eq_kobe <- ggplot(kobe_df, aes(x, y)) +
-    #draw data and error bars on final year
-    geom_path(aes(alpha = year)) + #if you want to connect the dots
-    geom_point(aes(color = year), size=3) +
-    # geom_errorbar(data = filter(kobe_df, year == max(kobe_df$year)),
-    #               aes(x = S_Smsy, ymin = U_Umsy_LCI, ymax = U_Umsy_UCI), width = 0) +
-    # geom_errorbarh(data = filter(kobe_df, year == max(kobe_df$year)),
-    #                aes(y = U_Umsy, xmin = S_Smsy_LCI, xmax = S_Smsy_UCI), height = 0) +
-    #add "crosshairs"
-    geom_vline(xintercept = 1, lty = 2) +
-    geom_hline(yintercept = 1, lty = 2) +
-    # geom_vline(xintercept = 0.8, lty = 3) +
-    #add labels to 80% Smsy, first and last year of data
-    # annotate("text", x = 0.8, y = .4, hjust = 0,
-    #          label = expression(italic(paste("80%",S)[MSY]))) +
-    annotate(
-      "rect", 
-      xmin = 0.8, 
-      xmax = 1, 
-      ymin = -1, 
-      ymax = 1, 
-      alpha = .2
-    ) +
-    geom_text(data = filter(kobe_df, year== min(kobe_df$year)|year== max(kobe_df$year)),
-              aes(label = c("'79", "'22")), #CHANGE THESE WITH NEW DATA!
-              hjust = 0-.2, vjust = 0-.2) +
-    geom_point(
-      data = filter(kobe_df, year== min(kobe_df$year)|year== max(kobe_df$year)),
-      colour = "red",
-      shape = 21,
-      size = 3
-    ) +
-    geom_text(
-      data = quadLabs, 
-      aes(
-        label = label,
-        hjust = hjust
-      )
-    ) +
-    coord_fixed(
-      ratio = 1,
-      xlim = c(0,2),
-      ylim = c(0,2),
-      expand = FALSE
-    ) +
-    scale_colour_viridis_c(name="Year") +
-    guides(alpha = "none") +
-    labs(y="U/Umsy", x= "S/Smsy") +
-    theme_bw(base_size = 12) +
-    theme(
-      legend.position = c(0.75, 0.65),
-      legend.background = element_rect(colour = "black")
+(kobe_plots <- kobe_dfs |> 
+    map(
+      ~ .x |> 
+        ggplot(aes(x, y)) +
+        #draw data and error bars on final year
+        geom_path(aes(alpha = year)) + #if you want to connect the dots
+        geom_point(aes(color = year), size=3) +
+        # geom_errorbar(data = filter(kobe_df, year == max(kobe_df$year)),
+        #               aes(x = S_Smsy, ymin = U_Umsy_LCI, ymax = U_Umsy_UCI), width = 0) +
+        # geom_errorbarh(data = filter(kobe_df, year == max(kobe_df$year)),
+        #                aes(y = U_Umsy, xmin = S_Smsy_LCI, xmax = S_Smsy_UCI), height = 0) +
+        #add "crosshairs"
+        geom_vline(xintercept = 1, lty = 2) +
+        geom_hline(yintercept = 1, lty = 2) +
+        # geom_vline(xintercept = 0.8, lty = 3) +
+        #add labels to 80% Smsy, first and last year of data
+        # annotate("text", x = 0.8, y = .4, hjust = 0,
+        #          label = expression(italic(paste("80%",S)[MSY]))) +
+        annotate(
+          "rect", 
+          xmin = 0.8, 
+          xmax = 1, 
+          ymin = -1, 
+          ymax = 1, 
+          alpha = .2
+        ) +
+        geom_richtext(
+          data = filter(.x, year== min(.x$year)|year== max(.x$year)),
+          aes(label = c("'79", "'22")), #CHANGE THESE WITH NEW DATA!
+          hjust = 0-.2, 
+          vjust = 0-.2,
+          label.colour = NA,
+          fill = alpha("white", 0.75)
+        ) +
+        geom_point(
+          data = filter(.x, year== min(.x$year)|year== max(.x$year)),
+          colour = "red",
+          shape = 21,
+          size = 3
+        ) +
+        geom_text(
+          data = quadLabs, 
+          aes(
+            label = label,
+            hjust = hjust
+          )
+        ) +
+        coord_fixed(
+          ratio = 1,
+          xlim = c(0,2),
+          ylim = c(0,2),
+          expand = FALSE
+        ) +
+        scale_colour_viridis_c(name="Year") +
+        scale_alpha(range = c(0.05, 0.9)) +
+        guides(alpha = "none") +
+        labs(y="U/Umsy", x= "S/Smsy") +
+        theme_bw(base_size = 12) +
+        theme(
+          legend.position = c(0.75, 0.65),
+          legend.background = element_rect(colour = "black")
+        )
     )
 )
 
-# Save the plot
-# Save the filled Kobe plot
-ggsave(
-  here("Kobe plot", "R-PLOT_WCVI_CN_Equilibrium_Kobe.png"),
-  eq_kobe,
-  height = 7,
-  width = 7,
-  units = "in"
-)
+
+# Save the filled Kobe plots
+kobe_plots |> 
+  iwalk(
+    ~ ggsave(
+      filename = here(
+        "Kobe plot", 
+        paste0("R-PLOT_WCVI_CN_", .y, ".png")
+      ),
+      plot = .x,
+      height = 7,
+      width = 7,
+      units = "in",
+      dpi = "print"
+    )
+  )
 
