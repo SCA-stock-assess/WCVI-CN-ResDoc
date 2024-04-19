@@ -16,7 +16,6 @@ library(ggtext)
 
 data <- here("FSAR 4-panel plot", "FSAR_4-panel_data.xlsx") |> 
   read_xlsx() |> 
-  mutate(ocean_er = ocean_er/100) |> 
   pivot_longer(!year) %>%
   split(.$name) |> 
   map(~spline(.x$year, .x$value)) |> 
@@ -84,8 +83,8 @@ plots <- data |>
       vjust = 0,
       hjust = 0,
       label = c(
-        "*U*<sub>MSY</sub> from equilibrium trade-off",
-        "*U*<sub>MSY</sub> from individual population benchmarks"
+        "*U*<sub>MSY</sub> based on moderate productivity",
+        "*U*<sub>MSY</sub> based on low productivity"
       ),
       colour = c("red", "blue"),
       label.colour = NA,
@@ -109,8 +108,8 @@ plots <- data |>
       vjust = 0,
       hjust = 0,
       label = c(
-        "80% *S*<sub>MSY</sub> from equilibrium trade-off",
-        "80% *S*<sub>MSY</sub> from individual population benchmarks"
+        "80% *S*<sub>MSY</sub> based on moderate productivity",
+        "80% *S*<sub>MSY</sub> based on low productivity"
       ),
       colour = c("red", "blue"),
       label.colour = NA,

@@ -174,9 +174,10 @@ smsy_lab <- tibble(
     x = smsy_lab$label + 1e3,
     y = 1000,
     colour = "grey50",
-    label = paste0("Seq = ", round(smsy_lab$label, 0)),
+    label = paste0("S[MSY] ==~", round(smsy_lab$label, 0)),
     angle = 270,
-    hjust = 1
+    hjust = 1,
+    parse = TRUE
   ) +
   scale_x_continuous(
     labels = scales::comma,
@@ -184,8 +185,8 @@ smsy_lab <- tibble(
     sec.axis = sec_axis(
       transform = ~1-(./max(.)),
       labels = scales::percent,
-      name = "Aggregate equilibrium ER",
-      breaks = seq(0, 0.95, by = 0.2)
+      name = "Aggregate ER",
+      breaks = seq(0, max(eq_sum_data$u), by = 0.2)
     )
   ) +
   scale_y_continuous(
