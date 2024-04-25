@@ -96,7 +96,7 @@ plots <- data |>
 
 (plots[[1]] <- plots[[1]] +
     geom_hline(
-      yintercept = c(18939, 13869)*0.8,
+      yintercept = c(18939, 13869)*0.85,
       colour = c("red", "blue"),
       lty = 2,
       linewidth = 0.75
@@ -104,12 +104,12 @@ plots <- data |>
     annotate(
       "richtext",
       x = 1977,
-      y = c(18950, 13910)*0.8,
+      y = c(18950, 13910)*0.85,
       vjust = 0,
       hjust = 0,
       label = c(
-        "80% *S*<sub>MSY</sub> based on moderate productivity",
-        "80% *S*<sub>MSY</sub> based on low productivity"
+        "85% *S*<sub>MSY</sub> based on moderate productivity",
+        "85% *S*<sub>MSY</sub> based on low productivity"
       ),
       colour = c("red", "blue"),
       label.colour = NA,
