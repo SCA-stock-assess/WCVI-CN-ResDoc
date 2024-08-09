@@ -53,7 +53,7 @@ dates_50 <- recoveries |>
   ggplot(aes(date, fct_rev(rl_stock_prod_area_cdfo))) +
   geom_density_ridges(
     alpha = 0.5,
-    scale = 1.25,
+    scale = 0.95,
     quantile_lines = TRUE,
     quantiles = 2,
     vline_colour = "red",
@@ -87,5 +87,5 @@ ggsave(
     "R-PLOT_CWT_run_timing_WVI_ridges.png"
   ),
   height = 5,
-  width = 7, units = "in"
+  width = 8, units = "in"
 )
