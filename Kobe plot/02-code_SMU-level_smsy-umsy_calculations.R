@@ -81,7 +81,7 @@ holt_params <- productivity |>
   rowwise() |> 
   mutate(
     data = list(
-      rnorm(10000, mean = mean_log_a, sd = 0.5) |> 
+      rnorm(1000, mean = mean_log_a, sd = 0.5) |> 
         as_tibble_col(column_name = "log_a") |>  
         filter(log_a > 0) |> 
         mutate(beta = log_a/srep) |> 
