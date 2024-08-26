@@ -1,0 +1,31 @@
+<!DOCTYPE qgis PUBLIC 'http://mrcc.com/qgis.dtd' 'SYSTEM'>
+<qgis version="3.34.4-Prizren">
+  <identifier>https://services2.arcgis.com/ouI9Ksmf4blkssRx/arcgis/rest/services/DFO_Facility_Locations/FeatureServer/11</identifier>
+  <parentidentifier></parentidentifier>
+  <language></language>
+  <type>dataset</type>
+  <title>DFO Hatcheries</title>
+  <abstract></abstract>
+  <links>
+    <link type="WWW:LINK" url="https://services2.arcgis.com/ouI9Ksmf4blkssRx/arcgis/rest/services/DFO_Facility_Locations/FeatureServer/11" size="" description="" format="" mimeType="" name="Source"/>
+  </links>
+  <dates/>
+  <fees></fees>
+  <encoding></encoding>
+  <crs>
+    <spatialrefsys nativeFormat="Wkt">
+      <wkt></wkt>
+      <proj4>+proj=merc +a=6378137 +b=6378137 +lat_ts=0 +lon_0=0 +x_0=0 +y_0=0 +k=1 +units=m +nadgrids=@null +wktext +no_defs</proj4>
+      <srsid>3857</srsid>
+      <srid>3857</srid>
+      <authid>EPSG:3857</authid>
+      <description>WGS 84 / Pseudo-Mercator</description>
+      <projectionacronym>merc</projectionacronym>
+      <ellipsoidacronym>EPSG:7030</ellipsoidacronym>
+      <geographicflag>false</geographicflag>
+    </spatialrefsys>
+  </crs>
+  <extent>
+    <spatial dimensions="2" minz="nan" maxy="8636373.36422615312039852" maxz="nan" crs="EPSG:3857" miny="6142854.37795746698975563" minx="-15039169.47627317160367966" maxx="-12985693.4182793777436018"/>
+  </extent>
+</qgis>
