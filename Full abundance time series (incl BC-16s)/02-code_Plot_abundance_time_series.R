@@ -8,8 +8,6 @@ pkgs <- c("here", "tidyverse", "readxl", "janitor")
 library(here); library(tidyverse); library(readxl); library(janitor)
 
 
-
-
 # Load and plot data ------------------------------------------------------
 
 
@@ -31,8 +29,8 @@ full_ts <- here(
     era = case_when(
       brood_year < 1995 & group != "Somass" ~ "Fishery officer counts",
       brood_year >= 1995 & group != "Somass" ~ "Formal survey",
-      brood_year < 1985 & group == "Somass" ~ "Fishery officer counts",
-      brood_year >= 1985 & group == "Somass" ~ "Formal survey" 
+      brood_year < 1986 & group == "Somass" ~ "Fishery officer counts",
+      brood_year >= 1986 & group == "Somass" ~ "Formal survey" 
     ),
     indicator = factor(
       indicator, 
