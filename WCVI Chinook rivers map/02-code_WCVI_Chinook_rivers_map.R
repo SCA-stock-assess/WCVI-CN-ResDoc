@@ -144,51 +144,63 @@ sf_use_s2(TRUE)
 
 
 # Plot
-(cn_rivers_map <- ggplot(full_coastline) +
-  geom_sf(
-    colour = NA,
-    fill = "grey70"
-  ) +
-  geom_sf(
-    data = vi_coastline, 
-    colour = NA,
-    fill = "grey70"
-  ) +
-  geom_sf(
-    data = stream_lines,
-    colour = "#08519C"
-  ) +
-  geom_sf(
-    data = hatcheries,
-    aes(colour = `Hatchery program`, size = `Hatchery program`)
-  ) +
-  geom_sf_label(
-    data = filter(hatcheries, FacType2 == "OPS Hatchery"),
-    aes(label = Fac_Name),
-    hjust = 0,
-    vjust = 0,
-    alpha = 0.8
-  ) +
-  annotation_scale(location = "bl") +
-  annotation_north_arrow(
-    location = "tr",
-    style = north_arrow_fancy_orienteering()
-  ) +
-  scale_y_continuous(breaks = c(49, 50)) +
-  scale_x_continuous(breaks = c(-125, -127)) +
-  scale_size_discrete(range = c(3,6)) +
-  scale_colour_brewer(palette = "Dark2") +
-  coord_sf(expand = FALSE) +
-  labs(x = NULL, y = NULL) +
-  theme(
-    panel.background = element_rect(fill = "lightblue1"),
-    panel.grid = element_blank(),
-    legend.position = c(0.05, 0.1),
-    legend.justification = c(0, 0),
-    legend.background = element_blank()
-  )
+(cn_rivers_map <- ggplot(difference) +
+    geom_sf(
+      colour = NA,
+      fill = "grey70"
+    ) +
+    # Super hacky fix to ensure Nootka Sd is fully shown
+    geom_rect(
+      aes(
+        xmin = -129,
+        xmax = -125,
+        ymin = 48,
+        ymax = 50.25
+      ),
+      fill = "lightblue1"
+    ) +
+    geom_sf(
+      data = vi_coastline, 
+      colour = NA,
+      fill = "grey70"
+    ) +
+    geom_sf(
+      data = stream_lines,
+      colour = "#08519C"
+    ) +
+    geom_sf(
+      data = hatcheries,
+      aes(colour = `Hatchery program`, size = `Hatchery program`)
+    ) +
+    geom_sf_label(
+      data = filter(hatcheries, FacType2 == "OPS Hatchery"),
+      aes(label = Fac_Name),
+      hjust = 0,
+      vjust = 0,
+      alpha = 0.8
+    ) +
+    annotation_scale(location = "bl") +
+    annotation_north_arrow(
+      location = "tr",
+      style = north_arrow_fancy_orienteering()
+    ) +
+    scale_y_continuous(breaks = c(49, 50)) +
+    scale_x_continuous(breaks = c(-125, -127)) +
+    scale_size_discrete(range = c(3,6)) +
+    scale_colour_brewer(palette = "Dark2") +
+    coord_sf(expand = FALSE) +
+    labs(x = NULL, y = NULL) +
+    theme(
+      panel.background = element_rect(fill = "lightblue1"),
+      panel.grid = element_blank(),
+      legend.position = c(0.05, 0.1),
+      legend.justification = c(0, 0),
+      legend.background = element_blank(),
+      axis.text = element_blank(),
+      axis.ticks = element_blank()
+    )
 )
-  
+
 
 # Export the plot
 ggsave(
