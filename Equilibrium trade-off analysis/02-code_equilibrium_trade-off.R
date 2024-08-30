@@ -208,7 +208,10 @@ smsy_lab <- tibble(
 # Save plot
 ggsave(
   eq_plot,
-  filename = here("Kobe plot", "R-PLOT_equilibrium_harvest_curves.png"),
+  filename = here(
+    "Equilibrium trade-off analysis", 
+    "R-PLOT_equilibrium_harvest_curves.png"
+  ),
   height = 5,
   width = 7, units = "in"
 )
