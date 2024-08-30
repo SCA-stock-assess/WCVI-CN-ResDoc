@@ -1,6 +1,6 @@
 # West Coast of Vancouver Island Chinook stock assessment work
 
-West Coast of Vancouver Island Chinook were prescribed to Batch 1 of the Fish Stock Provisions following amendments to the Fisheries Act (Bill C-68) in 2018. A rebuilding plan, supported by a Fisheries Science Advise Report (FSAR), was triggered as a result under section 6.2. This repository has been set up to document stock assessment work undertaken to support implementation of Section 6.2 of Bill C-68 for WCVI Chinook.
+West Coast of Vancouver Island Chinook were prescribed to Batch 1 of the Fish Stock Provisions following amendments to the Fisheries Act (Bill C-68) in 2018. A rebuilding plan, to be supported by a Fisheries Science Advise Report (FSAR), was triggered as a result under Section 6.2. This repository has been set up to document stock assessment work undertaken to support implementation of Section 6.2 of Bill C-68 for WCVI Chinook.
 
 Overarching projects are:
 1) WCVI Chinook Fisheries Science Advice Support (FSAR)
