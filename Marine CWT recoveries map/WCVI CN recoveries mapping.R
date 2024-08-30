@@ -4,7 +4,7 @@ pkgs <- c("tidyverse","scales","ggmap","here", "ggOceanMaps", "ggspatial")
 #install.packages(pkgs)
 
 library(here)
-library(tidyverse); theme_set(theme_bw(base_size = 14))
+library(tidyverse); theme_set(theme_bw(base_size = 12))
 library(scales)
 library(ggmap)
 library(ggOceanMaps)
@@ -129,14 +129,14 @@ rmis <- rmis.raw %>%
       "non-RCH WCVI"
     ),
     # Add random noise to the Sitka Sound recoveries
-    across(
-      latitude:longitude, 
-      ~ if_else(
-        str_detect(name, "(?i)sitka"),
-        jitter(.x, amount = 0.006),
-        .x
-      )
-    ),
+    # across(
+    #   latitude:longitude, 
+    #   ~ if_else(
+    #     str_detect(name, "(?i)sitka"),
+    #     jitter(.x, amount = 0.006),
+    #     .x
+    #   )
+    # ),
     binlon = cut(
       longitude, 
       seq(from = min(longitude), to = max(longitude), by = .005), 
@@ -162,9 +162,9 @@ rmis <- rmis.raw %>%
   ) %>% 
   droplevels()
 
-rmis %>% count(hatchery_location_name)
 
-rmis %>% count(binlon, binlat)
+# Display hatchery releases included in the time series
+rmis %>% count(hatchery_location_name)
 
 
 
@@ -174,15 +174,17 @@ rmis %>% count(binlon, binlat)
 
 # Group RMIS data to make bubble plot
 rmis_stacked <- count(rmis, binlat, binlon) |> 
+  rowwise() |> 
   mutate(
-    mid_binlat = as.numeric(str_extract(binlat, "(\\d|\\.)+")) + 0.0025,
-    mid_binlon = as.numeric(str_extract(binlon, "(-|\\d|\\.)+")) + 0.0025,
+    mid_binlat = get_midpoint(binlat),
+    mid_binlon = get_midpoint(binlon),
   ) |> 
+  ungroup() |> 
   arrange(n)
 
 
 # Breaks for the custom scale
-my_breaks <- c(100, 250, 400, 550, 700)
+my_breaks <- c(3, 30, 300, 3000)
 
 
 # Custom guide style
@@ -199,9 +201,9 @@ g <- guide_legend(
 # Base map with high-res bathymetry
 (NE_Pacific <- basemap(
   limits = c(
-    -172,
-    -119,
-    44.6,
+    -168,
+    -120,
+    47,
     61
   ),
   rotate = TRUE,
@@ -211,13 +213,14 @@ g <- guide_legend(
   grid.size = 0.1,
   land.col = "grey75",
   land.border.col = NA,
-  lon.interval = 20
+  lon.interval = 20,
+  lat.interval = 5
 ) 
 )
 
 
 # Data plotted on basemap
-recovery_distribution <- NE_Pacific +
+(recovery_distribution <- NE_Pacific +
   ggspatial::geom_spatial_point(
     data = rmis_stacked,
     aes(
@@ -230,7 +233,11 @@ recovery_distribution <- NE_Pacific +
     shape = 20,
     stroke = FALSE  
   ) +
-  ggspatial::annotation_scale(location = "br") +
+  annotation_north_arrow(
+    location = "tr",
+    style = north_arrow_fancy_orienteering(),
+    which_north = "true"
+  ) +
   labs(
     x = NULL,
     y = NULL
@@ -242,25 +249,29 @@ recovery_distribution <- NE_Pacific +
   ) +
   scale_size_continuous(
     breaks = my_breaks,
-    range = c(2,12)
+    range = c(1,6),
+    trans = "log10"
   ) +
   scale_alpha_continuous(
     breaks = my_breaks,
-    range = c(0.3, 0.85)
+    range = c(0.3, 0.7),
+    trans = "log10"
   ) +
   scale_color_viridis_c(
     breaks = my_breaks,
     option = "inferno",
+    trans = "log10"
   ) +
   theme(
-    legend.position = c(0.07,0.07),
+    legend.position = "inside",
+    legend.position.inside = c(0.07,0.07),
     legend.justification = c(0,0),
     legend.box = "horizontal",
-    legend.key.height = unit(0.65, "lines"),
+    legend.key.height = unit(0.43, "lines"),
     legend.background = element_rect(colour = "black"),
     legend.margin = margin(rep(0.4, 4), unit = "lines")
   ) 
-
+)
 
 
 # Save the map
