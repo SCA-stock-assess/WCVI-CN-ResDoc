@@ -14,10 +14,10 @@ library(readxl); library(here); library(tidyverse); library(janitor); library(gg
 # CWT recovery data
 recoveries <- list.files(
   here("CWT run timing"),
-  pattern = "evaluation-corridor-wspt-mgmt",
+  pattern = "(?i)01-data_cwt_run_timing",
   full.names = TRUE
 ) |> 
-  read_xlsx(sheet = "new data") |> 
+  read.csv(na.strings = c("")) |> 
   clean_names() |> 
   filter(
     rc_mrp_area_code %in% c("025", "125"),
