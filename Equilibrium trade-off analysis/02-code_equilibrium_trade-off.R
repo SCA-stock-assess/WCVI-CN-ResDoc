@@ -28,180 +28,227 @@ productivity <- tribble(
   )
 
 
-# Define functions for calculating Seq and Heq ----------------------------
+# Define functions for calculating Srep and Heq ----------------------------
 
 
-# Seq - equilibrium population escapement at fixed harvest rate
-Seq <- function(Smsy, Umsy, Ueq) {
+# Srep - equilibrium population escapement at fixed harvest rate
+Srep <- function(alpha, beta, U) {
   
-  numerator <- Umsy - log((1-Umsy)/(1-Ueq))
+  Srep = (alpha - (-log(1-U)))/beta
   
-  Seq = Smsy * (numerator/Umsy)
-  
-    return(Seq)
+  return(Srep) # Don't allow Srep < 0
 }
 
 
 # Heq - equilibrium harvest 
-Heq <- function(Ueq, Seq) {
-  Heq = (Ueq*Seq)/(1-Ueq)
+Heq <- function(alpha, beta, U) {
+  
+  Srep = (alpha - (-log(1-U)))/beta
+  
+  Heq = (Srep * exp(alpha-(beta*Srep))) - Srep
   
   return(Heq)
 }
 
 
-# Versions from Carrie Holt's email
-Seq_holt <- function(alpha, beta, U) {
-  
-  Seq = (alpha - (-log(1-U)))/beta
-  
-  return(Seq) # Don't allow Seq < 0
-}
-
-Heq_holt <- function(alpha, beta, U) {
-  
-  Seq = (alpha - (-log(1-U)))/beta
-  
-  Heq = Seq * exp(alpha-beta*Seq)-Seq
-  
-  return(Heq)
-}
 
 
-# Simple example with Carrie's method -------------------------------------
+# Calculate equilibrium harvest curves -------------------------------------
 
 
 # Define range of harvest rates
-Ueq <- tibble(Ueq = seq(0, 0.95, by = 0.05))
+U <- tibble(U = seq(0, 1, by = 0.05))
 
 
 # Get data summarized by CU
-holt_params <- productivity |> 
-  select(1:3) |> 
+cu_params <- productivity |> 
+  select(1:4) |> 
   rowwise() |> 
   mutate(
     data = list(
-      rnorm(1000, mean = mean_log_a, sd = 0.5) |> 
+      rnorm(1000, mean = mean_log_a, sd = sd_log_a) |> 
         as_tibble_col(column_name = "log_a") |>  
-        filter(log_a > 0) |> 
+        #filter(log_a > 0) |> 
         mutate(beta = log_a/srep) |> 
-        crossing(Ueq) |> 
+        crossing(U) |> 
         mutate(
-          Seq = Seq_holt(alpha = log_a, beta = beta, U = Ueq),
-          Heq = Heq_holt(alpha = log_a, beta = beta, U = Ueq),
-          #across(Seq:Heq, ~if_else(.x < 0, 0, .x))
+          Srep = Srep(alpha = log_a, beta = beta, U = U),
+          Heq = Heq(alpha = log_a, beta = beta, U = U),
+          across(Srep:Heq, ~if_else(U == 1, 0, .x))
         )
     )  
   )
 
 
 # Calculate CU-level Umsy
-umsy_vals <- productivity |> 
-  mutate(umsy = beta * ((mean_log_a*(0.5-0.07*mean_log_a))/beta)) |> 
-  pull(umsy)
+umsy_vals <- cu_params |> 
+  unnest(data) |> 
+  distinct(cu, log_a, beta) |> 
+  mutate(umsy = beta * ((log_a*(0.5-0.07*log_a))/beta)) |> 
+  summarise(
+    .by = cu,
+    umsy_mid = median(umsy),
+    umsy_lwr = quantile(umsy, 0.25),
+    umsy_upr = quantile(umsy, 0.75)
+  )
 
 
 # Unpack and summarize data
-eq_sum_data <- holt_params |> 
+eq_sum_data <- cu_params |> 
   unnest(data) |> 
-  #filter(!if_any(Seq:Heq, ~(is.na(.x) | is.infinite(.x)))) |> 
+  filter(!if_any(Srep:Heq, ~(is.na(.x) | is.infinite(.x)))) |> 
   mutate(
     .by = cu,
     id = row_number(),
-    across(Seq:Heq, ~if_else(.x < 0, 0, .x))
+    across(Srep:Heq, ~if_else(.x < 0, 0, .x))
   ) |> 
   summarize(
-    .by = c(id, Ueq),
-    across(Seq:Heq, sum)
+    .by = c(id, U),
+    across(Srep:Heq, sum)
   ) |> 
   summarize(
-    .by = Ueq,
-    Seq = median(Seq),
+    .by = U,
+    Srep = median(Srep),
     Heq_mid = median(Heq),
     Heq_lwr = quantile(Heq, 0.25),
     Heq_upr = quantile(Heq, 0.75)
   ) |> 
   mutate(
-    umsy = list(umsy_vals),
-    num_cu_exceed_umsy = map2(
-      .x = Ueq,
-      .y = umsy,
-      ~ifelse(.x > .y, 1, 0)
-    ) |> 
-      map(sum) |> 
-      unlist()
+    umsy_mid = list(umsy_vals$umsy_mid),
+    umsy_lwr = list(umsy_vals$umsy_lwr),
+    umsy_upr = list(umsy_vals$umsy_upr),
+    across(
+      contains("umsy"),
+      ~map2(
+        .x = U,
+        .y = .,
+        ~ifelse(.x > .y, 1, 0)
+      ) |> 
+        map(sum) |> 
+        unlist(),
+      .names = "num_cu_exceed_{.col}"
+    )
   )
+
 
   
 # Calculate secondary y axis transformation
-ratio <- max(eq_sum_data$Heq_upr)/max(eq_sum_data$num_cu_exceed_umsy)
+ratio <- max(eq_sum_data$Heq_upr)*1.05/max(eq_sum_data$num_cu_exceed_umsy_upr)
+
+
+# Calculate Smsy median, upper, and lower values
+mid_Heq_Smsy = max(eq_sum_data$Heq_mid)
+lwr_Heq_Smsy = max(eq_sum_data$Heq_lwr)
+upr_Heq_Smsy = max(eq_sum_data$Heq_upr)
 
 
 # label Smsy
 smsy_lab <- tibble(
-  Heq_mid = max(eq_sum_data$Heq_mid),
-  label = eq_sum_data$Seq[eq_sum_data$Heq_mid == max(eq_sum_data$Heq_mid)]
-)
+  Smsy_mid = eq_sum_data$Srep[eq_sum_data$Heq_mid == mid_Heq_Smsy],
+  # Heq and Smsy lower and upper bounds are reversed
+  Smsy_upr = eq_sum_data$Srep[eq_sum_data$Heq_lwr == lwr_Heq_Smsy],
+  Smsy_lwr = eq_sum_data$Srep[eq_sum_data$Heq_upr == upr_Heq_Smsy],
+  Heq_mid = mid_Heq_Smsy
+) |> 
+  mutate(label = Smsy_mid)
+
 
 
 # Plot summarized data
-(eq_plot <- ggplot(eq_sum_data, aes(x = Seq, y = Heq_mid)) +
-  geom_line(
-    colour = "blue",
-    linewidth = 1
-  ) +
-  geom_ribbon(
-    aes(ymin = Heq_lwr, ymax = Heq_upr),
-    fill = "blue",
-    alpha = 0.3
-  ) +
-  geom_line(
-    aes(y = num_cu_exceed_umsy*ratio),
-    colour = "red",
-    linewidth = 1
-  ) +
-  annotate(
-    "segment",
-    x = smsy_lab$label,
-    y = 0, 
-    yend = smsy_lab$Heq_mid,
-    lty = 2,
-    colour = "grey50",
-    linewidth = 0.75
-  ) +
-  annotate(
-    "text",
-    x = smsy_lab$label + 1e3,
-    y = 1000,
-    colour = "grey50",
-    label = paste0("S[MSY] ==~", round(smsy_lab$label, 0)),
-    angle = 270,
-    hjust = 1,
-    parse = TRUE
-  ) +
-  scale_x_continuous(
-    labels = scales::comma,
-    expand = expansion(mult = c(0, 0)),
-    sec.axis = sec_axis(
-      transform = ~1-(./max(.)),
-      labels = scales::percent,
-      name = "Aggregate ER",
-      breaks = seq(0, max(eq_sum_data$u), by = 0.2)
+(eq_plot <- ggplot(eq_sum_data, aes(x = Srep, y = Heq_mid)) +
+    # Add vertical lines showing harvest rate steps
+    geom_vline(
+      xintercept = unique(eq_sum_data$Srep),
+      colour = "grey90"
+    ) +
+    # Label harvest rate steps
+    annotate(
+      "text",
+      x = unique(eq_sum_data$Srep),
+      y = upr_Heq_Smsy,
+      label = eq_sum_data |> 
+        distinct(Srep, .keep_all = TRUE) |> 
+        pull(U) |> 
+        scales::percent(),
+      # Make text vertical and offset to the right of the lines
+      angle = 270,
+      vjust = -0.5,
+      hjust = 0,
+      colour = "grey75"
+    ) +
+    # Add stepped line showing # CUs where agg ER exceeds Umsy
+    geom_step(
+      aes(y = num_cu_exceed_umsy_mid*ratio),
+      colour = "red",
+      linewidth = 1.25
+    ) +
+    # Add stepped CI corresponding to the stepped line
+    geom_rect(
+      aes(
+        xmin = Srep,
+        xmax = lead(Srep),
+        ymin = num_cu_exceed_umsy_lwr*ratio, 
+        ymax = num_cu_exceed_umsy_upr*ratio
+      ),
+      fill = "red",
+      alpha = 0.2
+    ) +
+    geom_line(
+      colour = "blue",
+      linewidth = 1
+    ) +
+    geom_ribbon(
+      aes(ymin = Heq_lwr, ymax = Heq_upr),
+      fill = "blue",
+      alpha = 0.2
+    ) +
+    # Pointrange showing the estimated Smsy
+    geom_pointrange(
+      data = smsy_lab,
+      aes(x = Smsy_mid, xmin = Smsy_lwr, xmax = Smsy_upr),
+      size = 1,
+      linewidth = 1
+    ) +
+    # Add text annotation that states midpoint and IQR of Smsy
+    annotate(
+      "text",
+      x = smsy_lab$label,
+      y = smsy_lab$Heq_mid,
+      label = paste0(
+        "S[MSY] ==~", 
+        round(smsy_lab$label, 0),
+        "~(IQR:~",
+        round(smsy_lab$Smsy_lwr),
+        "-",
+        round(smsy_lab$Smsy_upr),
+        ")"
+      ),
+      hjust = 0.1,
+      vjust = -1,
+      parse = TRUE
+    ) +
+    scale_x_continuous(
+      labels = scales::comma,
+      expand = expansion(mult = c(0, 0))
+    ) +
+    scale_y_continuous(
+      labels = scales::comma,
+      expand = expansion(mult = c(0, 0)),
+      sec.axis = sec_axis(
+        transform = ~./ratio,
+        name = "Number of CUs where agg. ER > Umsy"
+      )
+    ) +
+    labs(
+      y = "Aggregate equilibrium harvest",
+      x = "Aggregate equilibrium spawners"
+    ) +
+    theme_classic() +
+    # Match axis title colour to corresponding line colour
+    theme(
+      axis.title.y.left = element_text(colour = "blue"),
+      axis.title.y.right = element_text(colour = "red"),
     )
-  ) +
-  scale_y_continuous(
-    labels = scales::comma,
-    expand = expansion(mult = c(0, 0.05)),
-    sec.axis = sec_axis(
-      transform = ~./ratio,
-      name = "Number of CUs where agg. ER > Umsy"
-    )
-  ) +
-  labs(
-    y = "Aggregate equilibrium harvest",
-    x = "Aggregate equilibrium spawners"
-  ) +
-  theme_bw()
 )
 
 
@@ -215,126 +262,5 @@ ggsave(
   height = 5,
   width = 7, units = "in"
 )
-
-
-# Old stuff probably no longer needed -------------------------------------
-
-
-# Using RPs from 3 different methods
-rp_data <- list.files(
-  here("Kobe plot"),
-  pattern = "(?i)bootstrappedRPs",
-  full.names = TRUE
-) |> 
-  read_excel(sheet = "wcviCK-BootstrappedRPs_ExtInd_R", range = cell_cols("B:J")) |> 
-  clean_names() |> 
-  filter(!str_detect(stock, "\\*")) |> # Remove rows flagged with asterisks (follow up w/Wilf on these)
-  pivot_wider(
-    names_from = rp,
-    values_from = value:upr,
-    names_sep = "_"
-  ) |> 
-  rename_with(~str_to_lower(str_replace(.x, "value_", "median_"))) |> 
-  left_join(productivity) |> 
-  mutate(
-    #beta = mean_log_a/median_srep,
-    umsy = beta*median_smsy,
-    recruits_at_0.85smsy = alpha*0.85*median_smsy*(exp(-beta*0.85*median_smsy))
-  ) |> 
-  # Clean up river names
-  mutate(stock = make_clean_names(stock, allow_dupes = TRUE))
-
-
-# Are any stocks duplicated across methods?
-rp_data |> 
-  filter(
-    .by = c(stock, method),
-    n() > 1
-  )
-
-
-
-# Add harvest rates to data and execute calculations
-eq_data <- rp_data |> 
-  crossing(Ueq) |> 
-  rowwise() |> 
-  mutate(
-    across(
-      c(median_smsy, lwr_smsy, upr_smsy), 
-      ~Seq(Smsy = .x, Umsy = umsy, Ueq = Ueq),
-      .names = "{paste0('Seq_', str_remove_all(.col, '_smsy'))}"
-    ),
-    across(
-      contains("Seq"),
-      ~Heq(Ueq = Ueq, Seq = .x),
-      .names = "{paste0('Heq_', str_remove_all(.col, 'Seq_'))}"
-    )
-  ) |> 
-  ungroup() |> 
-  # Calculate aggregate values for the SMU
-  mutate(
-    .by = c(Ueq, method),
-    across(
-      matches("(S|H)eq"), 
-      sum, 
-      .names = "agg_{.col}"
-    ),
-    agg_ER_median = agg_Heq_median / (agg_Seq_median + agg_Heq_median),
-    agg_ER_lwr = agg_Heq_lwr/(agg_Seq_median + agg_Heq_lwr),
-    agg_ER_upr = agg_Heq_upr/(agg_Seq_median + agg_Heq_upr),
-    num_stocks_exceed_umsy_median = sum(agg_ER_median > umsy),
-    num_stocks_exceed_umsy_lwr = sum(agg_ER_lwr > umsy),
-    num_stocks_exceed_umsy_upr = sum(agg_ER_upr > umsy)
-  )
-
-
-# Take a stab at plot
-eq_plot <- function(var) {
-  
-  data <- eq_data |> 
-    filter(method == var) |> 
-    distinct(Ueq, pick(matches("agg_(H|S)eq")), pick(matches("num_stocks_exceed"))) |> 
-    mutate(across(matches("(H|S)eq"), ~if_else(.x < 0, 0, .x)))
-  
-  
-  trans_ratio <- max(data$agg_Heq_upr)/max(data$num_stocks_exceed_umsy_median)
-  
-  
-  plot <- ggplot(data, aes(x = agg_Seq_median, y = agg_Heq_median)) +
-    geom_line(colour = "blue") +
-    geom_ribbon(
-      aes(ymin = agg_Heq_lwr, ymax = agg_Heq_upr),
-      fill = "blue",
-      alpha = 0.3
-    ) +
-    geom_line(
-      aes(y = num_stocks_exceed_umsy_median * trans_ratio), 
-      colour = "red"
-    ) +
-    geom_ribbon(
-      aes(
-        ymin = num_stocks_exceed_umsy_lwr * trans_ratio, 
-        ymax = num_stocks_exceed_umsy_upr * trans_ratio
-      ),
-      fill = "red",
-      alpha = 0.3
-    ) +
-    scale_y_continuous(
-      sec.axis = sec_axis(
-        transform = ~./trans_ratio,
-        name = "Number of stocks where\naggregate ER > Umsy"
-      )
-    ) +
-    labs(title = var)
-  
-  return(plot)
-}
-
-
-# Plots for each method
-set_names(unique(eq_data$method)) |> 
-  map(~eq_plot(var = .x))
-
-
 
 
