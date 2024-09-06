@@ -56,52 +56,19 @@ stream_lines <- read_sf(
 
 
 # Define bounding box for Vancouver Island
-vi_coords <- c(xmin = -129.5, xmax = -123, ymin = 48, ymax = 51)
+vi_coords <- c(xmin = -129, xmax = -122.5, ymin = 48, ymax = 51)
 vi_bbox <- st_bbox(vi_coords, crs = "NAD83")
-
-
-# Disable spherical geometry
-sf_use_s2(FALSE)
 
 
 # High-res coastline for Vancouver Island
 vi_coastline <- read_sf(
   here(
     "WCVI Chinook rivers map",
-    "FWA_COASTLINES_SP",
-    "FWCSTLNSSP_line.shp"
+    "Coastline",
+    "Coastline.shp"
   )
 ) |> 
-  st_transform(crs = "NAD83") |> 
-  st_crop(vi_bbox) |> 
-  # Constrain data to include only Van Isle watersheds
-  filter(
-    WTRSHDGRPC %in% c(
-      "NEVI", "NIMP", "COMX", "TAHS", "COWN", "VICT", 
-      "SANJ", "PARK", "ALBN", "CLAY", "GOLD", "BRKS",
-      "TSIT", "HOLB", "CAMB", "SALM"
-    )
-  ) |> 
-  st_union() |> 
-  st_polygonize()
-
-
-# Coastline polygons for BC and WA
-full_coastline <- read_sf(
-  here(
-    "WCVI Chinook rivers map",
-    "GSHHS_shp",
-    "h",
-    "GSHHS_h_L1.shp"
-  )
-) |> 
-  st_transform(crs = "NAD83") |> 
-  st_crop(vi_bbox) 
-
-
-# Find where the two maps cross over and remove the overlapping area
-intersection <- st_intersection(vi_coastline, full_coastline)
-difference <- st_difference(full_coastline, st_union(st_geometry(intersection)))
+  st_transform(crs = "NAD83")
 
 
 # Shapefile containing DFO hatchery locations
@@ -139,28 +106,9 @@ hatcheries <- read_sf(
   )
 
 
-# Enable spherical geometry
-sf_use_s2(TRUE)
-
-
 # Plot
-(cn_rivers_map <- ggplot(difference) +
+(cn_rivers_map <- ggplot(vi_coastline) +
     geom_sf(
-      colour = NA,
-      fill = "grey70"
-    ) +
-    # Super hacky fix to ensure Nootka Sd is fully shown
-    geom_rect(
-      aes(
-        xmin = -129,
-        xmax = -125,
-        ymin = 48,
-        ymax = 50.25
-      ),
-      fill = "lightblue1"
-    ) +
-    geom_sf(
-      data = vi_coastline, 
       colour = NA,
       fill = "grey70"
     ) +
@@ -184,11 +132,13 @@ sf_use_s2(TRUE)
       location = "tr",
       style = north_arrow_fancy_orienteering()
     ) +
-    scale_y_continuous(breaks = c(49, 50)) +
-    scale_x_continuous(breaks = c(-125, -127)) +
     scale_size_discrete(range = c(3,6)) +
     scale_colour_brewer(palette = "Dark2") +
-    coord_sf(expand = FALSE) +
+    coord_sf(
+      expand = FALSE,
+      xlim = c(-129, -122.5), 
+      ylim = c(48, 51)
+      ) +
     labs(x = NULL, y = NULL) +
     theme(
       panel.background = element_rect(fill = "lightblue1"),
