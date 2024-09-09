@@ -9,6 +9,10 @@ library(readxl)
 library(janitor)
 
 
+# Disable scientific notation in outputs
+options(scipen = 999)
+
+
 # Productivity distributions for each CU ----------------------------------
 
 
@@ -16,16 +20,31 @@ library(janitor)
 # (https://waves-vagues.dfo-mpo.gc.ca/library-bibliotheque/41195255.pdf)
 # Table 10 (Page 56)
 productivity <- tribble(
-  ~cu, ~mean_log_a, ~srep,
-  "SWVI", 1.14, 15180,
-  "NWVI", 1.58, 3350,
-  "NoKy", 1.53, 26325
+  ~cu, ~mean_log_a, ~mean_log_srep, ~log_srep_sd,
+  "SWVI", 1.14, 9.711, 0.286,
+  "NWVI", 1.58, 8.196, 0.32,
+  "NoKy", 1.53, 10.247, 0.285
 ) |> 
   mutate(
     sd_log_a = 0.5,
-    alpha = exp(mean_log_a),
-    beta = mean_log_a/srep
-  )
+    mean_srep = exp(mean_log_srep - 0.5*log_srep_sd^2)
+  ) |> 
+  rowwise() |> 
+  # Bootstrap beta values from distribution of alpha and srep
+  mutate(
+    beta = list(
+      tibble(
+        log_a = rnorm(1000, mean = mean_log_a, sd = sd_log_a),
+        srep = exp(rnorm(1000, mean = mean_log_srep, sd = log_srep_sd))
+      ) |> 
+        mutate(beta = log_a/srep) |> 
+        summarize(
+          mean_beta = mean(beta),
+          sd_beta = sd(beta)
+        )
+    )
+  ) |> 
+  unnest(beta)
 
 
 # Define functions for calculating Srep and Heq ----------------------------
@@ -62,12 +81,14 @@ U <- tibble(U = seq(0, 1, by = 0.05))
 
 # Get data summarized by CU
 cu_params <- productivity |> 
-  select(1:4) |> 
+  select(cu, matches("log_(a|srep)")) |> 
   rowwise() |> 
   mutate(
     data = list(
-      rnorm(1000, mean = mean_log_a, sd = sd_log_a) |> 
-        as_tibble_col(column_name = "log_a") |>  
+      tibble(
+        log_a = rnorm(1000, mean = mean_log_a, sd = sd_log_a),
+        srep = exp(rnorm(1000, mean = mean_log_srep, sd = log_srep_sd))
+      ) |> 
         #filter(log_a > 0) |> 
         mutate(beta = log_a/srep) |> 
         crossing(U) |> 
@@ -259,7 +280,7 @@ ggsave(
     "Equilibrium trade-off analysis", 
     "R-PLOT_equilibrium_harvest_curves.png"
   ),
-  height = 5,
+  height = 4.5,
   width = 7, units = "in"
 )
 
