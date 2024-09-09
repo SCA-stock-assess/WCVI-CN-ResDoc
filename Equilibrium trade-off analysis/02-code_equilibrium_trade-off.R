@@ -55,7 +55,7 @@ Srep <- function(alpha, beta, U) {
   
   Srep = (alpha - (-log(1-U)))/beta
   
-  return(Srep) # Don't allow Srep < 0
+  return(Srep) 
 }
 
 
@@ -68,7 +68,6 @@ Heq <- function(alpha, beta, U) {
   
   return(Heq)
 }
-
 
 
 
@@ -153,7 +152,7 @@ eq_sum_data <- cu_params |>
 
 
   
-# Calculate secondary y axis transformation
+# Calculate secondary y-axis transformation
 ratio <- max(eq_sum_data$Heq_upr)*1.05/max(eq_sum_data$num_cu_exceed_umsy_upr)
 
 
