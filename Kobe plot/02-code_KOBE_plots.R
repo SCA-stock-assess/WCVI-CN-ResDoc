@@ -36,12 +36,9 @@ indicator_esc <- read_xlsx(
 
 
 # Estimated Robertson CN exploitation rate time series
-rch_er <- read_xlsx(
-  here("Kobe plot", "01-data_HOLT SR parameters KOBE PLOT.xlsx"),
-  sheet = "Raw KOBE data"
-) |> 
+rch_er <- read.csv(here("Kobe plot", "01-data_2024ERA_MREERdata_11.06.2024.csv")) |> 
   clean_names() |> 
-  select(year, contains("non_terminal_er")) |> 
+  select(year, rate) |> 
   rename("er" = 2)
 
 
@@ -128,8 +125,8 @@ kobe_data_alt <- indicator_esc |>
   ) |> 
   left_join(rch_er) |>
   mutate(
-    smsy = 18057,
-    umsy = 0.56,
+    smsy = 20167,
+    umsy = 0.55,
     y = er/umsy,
     x = escapement/smsy,
     quadrant = case_when(
@@ -213,10 +210,11 @@ quadLabs <- data.frame(
     ) +
     annotate(
       "text",
-      label = "Amber zone", 
+      label = "85*\'%\'~S[MSY]", 
       x = 0.9, 
       y = 0.25, 
-      angle = 90
+      angle = 90,
+      parse = TRUE
     ) +
     geom_text(
       data = quadLabs, 
@@ -332,18 +330,9 @@ kobe_dfs <- list("RR" = kobe_data_alt, "LifeCycle" = kobe_data) |>
 (kobe_plots <- kobe_dfs |> 
     ggplot(aes(x, y)) +
     facet_wrap(~method, nrow = 1) +
-    #draw data and error bars on final year
-    # geom_errorbar(data = filter(kobe_df, year == max(kobe_df$year)),
-    #               aes(x = S_Smsy, ymin = U_Umsy_LCI, ymax = U_Umsy_UCI), width = 0) +
-    # geom_errorbarh(data = filter(kobe_df, year == max(kobe_df$year)),
-    #                aes(y = U_Umsy, xmin = S_Smsy_LCI, xmax = S_Smsy_UCI), height = 0) +
     #add "crosshairs"
     geom_vline(xintercept = 1, lty = 2) +
     geom_hline(yintercept = 1, lty = 2) +
-    # geom_vline(xintercept = 0.8, lty = 3) +
-    #add labels to 80% Smsy, first and last year of data
-    # annotate("text", x = 0.8, y = .4, hjust = 0,
-    #          label = expression(italic(paste("80%",S)[MSY]))) +
     geom_path(aes(alpha = year)) + #if you want to connect the dots
     geom_point(aes(color = year), size=3) +
     annotate(
@@ -354,9 +343,25 @@ kobe_dfs <- list("RR" = kobe_data_alt, "LifeCycle" = kobe_data) |>
       ymax = 1, 
       alpha = .2
     ) +
+    annotate(
+      "text",
+      label = "85*\'%\'~S[MSY]", 
+      x = 0.9, 
+      y = 0.25, 
+      angle = 90,
+      parse = TRUE
+    ) +
     geom_richtext(
       data = filter(kobe_dfs, year== min(year)|year== max(year)),
-      aes(label = rep(c("'79", "'22"), 2)), #CHANGE THESE WITH NEW DATA!
+      aes(
+        label = rep(
+          c(
+            paste0("'", str_sub(min(kobe_dfs$year), 3L)), 
+            paste0("'", str_sub(max(kobe_dfs$year), 3L)) 
+          ), 
+          2
+        )
+      ),
       hjust = 0-.2, 
       vjust = 0-.2,
       label.colour = NA,
@@ -390,9 +395,13 @@ kobe_dfs <- list("RR" = kobe_data_alt, "LifeCycle" = kobe_data) |>
         title.position = "top"
       )
     ) +
-    scale_alpha(range = c(0.05, 0.9)) +
+    scale_alpha(range = c(0.05, 0.85)) +
     guides(alpha = "none") +
-    labs(y="U/Umsy", x= "S/Smsy") +
+    labs(
+      y = expression(U/U[MSY]), 
+      x = expression(S/S[MSY]),
+      parse = TRUE
+      ) +
     theme_bw(base_size = 12) +
     theme(
       legend.position = "top",
