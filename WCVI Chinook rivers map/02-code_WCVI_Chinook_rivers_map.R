@@ -7,7 +7,7 @@ pkgs <- c("here", "tidyverse", "readxl", "janitor", "sf", "stars", "ggspatial")
 
 # Load packages
 library(here)
-library(tidyverse); theme_set(theme_bw(base_size = 14))
+library(tidyverse); theme_set(theme_bw(base_size = 12))
 library(readxl)
 library(janitor)
 library(sf) # Large library providing many tools for working with spatial data 
@@ -21,19 +21,28 @@ library(ggspatial) # Add scalebar and North arrow to plots
 
 
 # List of WCVI Chinook Rivers from Diana's FWA table
-cn_stream_names <- read_xlsx(
-  here("Kobe plot", "01-data_FWA table update version 4 April17.xlsx"),
-  sheet = "RiverEscData",
-  skip = 2
+cn_streams_list <- read_xlsx(
+  here(
+    "WCVI Chinook rivers map", 
+    "WCVI_CN_streams_master_list.xlsx"
+  )
 ) |> 
   clean_names() |> 
-  filter(!is.na(stream_name)) |> 
-  pull(stream_name) |> 
-  str_to_title() |> 
-  str_remove_all("(?i)river|creek|creeks|\\(.+\\)|aggregate|tribs|lake|system") |> 
-  str_split_fixed("/", 2) |> 
-  str_trim() |> 
-  str_subset("\\w+")
+  separate(
+    tributaries,
+    sep = ", ",
+    into = c("trib1", "trib2")
+  ) |> 
+  pivot_longer(
+    cols = c(mainstem, trib1, trib2),
+    values_to = "stream",
+    values_drop_na = TRUE
+  ) |> 
+  select(cu, pfma, indicator_status, designation, stream)
+
+
+# Extract column of stream names as a character vector
+cn_stream_names <- pull(.data = cn_streams_list, stream)
 
 
 # Vancouver island stream arcs from BC Freshwater Atlas
@@ -45,16 +54,57 @@ stream_lines <- read_sf(
   )
 ) |> 
   rename_with(str_to_lower) |> 
+  # Remove some creeks that do not belong but match names in the list
+  filter(!gnis_name %in% c("Gold Creek", "Marble Creek", "Harris Creek")) |> 
   mutate(
-    gnis_name = str_remove_all(gnis_name, "(?i)creek|river") |> 
-      str_trim()
+    # Some enumerated creeks are unnamed in the FWA
+    gnis_new_name = case_when(
+      bllnk == 	354154385 ~ "Harris Creek", # FWA has two Harris Creeks on WCVI, this is the correct one
+      bllnk == 354140796 ~ "Warn Bay Creek", 
+      bllnk == 354141433 ~ "Chum Creek",
+      bllnk == 354152375 ~ "Deserted Creek",
+      bllnk == 354151632 ~ "Hammond Creek",
+      bllnk == 354149782 ~ "Marvinas Bay Creek",
+      bllnk == 354151033 ~ "Easy Creek",
+      bllnk == 354153393 ~ "McKay Cove Creek",
+      bllnk == 354153029 ~ "Nasparti River",
+      TRUE ~ gnis_name
+    ) 
   ) |> 
-  filter(gnis_name %in% c(cn_stream_names, "Stamp"))
+  filter(gnis_new_name %in% cn_stream_names) |> 
+  relocate(gnis_name, .before = gnis_new_name) |> 
+  left_join(
+    select(cn_streams_list, stream, indicator_status),
+    by = c("gnis_new_name" = "stream")
+  ) |> 
+  mutate(
+    indicator_status = 
+      factor(
+        indicator_status, 
+        levels = c("PSC indicator", "SEP major ops", "Intensive", "Extensive", "Non-indicator")
+      )
+  )
 
+
+# Check if all rivers in the streams list could be found in the FWA
+stopifnot(length(cn_stream_names) == length(unique(stream_lines$gnis_new_name)))
+
+
+# See what's missing (toggle to TRUE to run)
+if(FALSE) {
+cn_stream_names |> 
+  as_tibble_col(column_name = "stream") |> 
+  left_join(
+    distinct(stream_lines, gnis_new_name),
+    by = c("stream" = "gnis_new_name"),
+    keep = TRUE
+  ) |> 
+  print(n = length(cn_stream_names))
+}
 
 
 # Define bounding box for Vancouver Island
-vi_coords <- c(xmin = -129, xmax = -122.5, ymin = 48, ymax = 51)
+vi_coords <- c(xmin = -129, xmax = -123, ymin = 48, ymax = 51)
 vi_bbox <- st_bbox(vi_coords, crs = "NAD83")
 
 
@@ -149,7 +199,7 @@ g <- guide_legend(override.aes = list(fill = NA))
 (basemap1 <- ggplot(land) +
   geom_sf(
     colour = NA,
-    fill = "grey65"
+    fill = "grey70"
   ) +
   annotation_scale(location = "bl") +
   annotation_north_arrow(
@@ -158,7 +208,7 @@ g <- guide_legend(override.aes = list(fill = NA))
   ) +
   coord_sf(
     expand = FALSE,
-    xlim = c(-129, -122.5), 
+    xlim = c(-129, -123), 
     ylim = c(48, 51)
   ) +
   labs(x = NULL, y = NULL) +
@@ -167,7 +217,8 @@ g <- guide_legend(override.aes = list(fill = NA))
     panel.grid = element_blank(),
     axis.text = element_blank(),
     axis.ticks = element_blank(),
-    legend.position = c(0.05, 0.1),
+    legend.position = "inside",
+    legend.position.inside = c(0.05, 0.07),
     legend.justification = c(0, 0)
   )
 )
@@ -178,7 +229,7 @@ g <- guide_legend(override.aes = list(fill = NA))
     geom_stars(data = bathy) +
     geom_sf(
       colour = NA,
-      fill = "grey65"
+      fill = "grey70"
     ) +
     annotation_scale(location = "bl") +
     annotation_north_arrow(
@@ -187,7 +238,7 @@ g <- guide_legend(override.aes = list(fill = NA))
     ) +
     coord_sf(
       expand = FALSE,
-      xlim = c(-129, -122.5), 
+      xlim = c(-129, -123), 
       ylim = c(48, 51)
     ) +
     labs(x = NULL, y = NULL) +
@@ -197,7 +248,8 @@ g <- guide_legend(override.aes = list(fill = NA))
       panel.grid = element_blank(),
       axis.text = element_blank(),
       axis.ticks = element_blank(),
-      legend.position = c(0.05, 0.1),
+      legend.position = "inside",
+      legend.position.inside = c(0.05, 0.07),
       legend.justification = c(0, 0)
     )
 )
@@ -207,11 +259,17 @@ g <- guide_legend(override.aes = list(fill = NA))
 (cn_rivers_map <- basemap1 +
     geom_sf(
       data = stream_lines,
-      colour = "#08519C"
+      aes(colour = indicator_status)
+    ) +
+    # Overlay lakes on top of stream lines
+    geom_sf(
+      data = lakes,
+      fill = "lightblue1",
+      colour = NA
     ) +
     geom_sf(
       data = hatcheries,
-      aes(colour = `Hatchery program`, size = `Hatchery program`)
+      aes(shape = `Hatchery program`, size = `Hatchery program`)
     ) +
     geom_sf_label(
       data = filter(hatcheries, FacType2 == "OPS Hatchery"),
@@ -221,31 +279,48 @@ g <- guide_legend(override.aes = list(fill = NA))
       alpha = 0.8
     ) +
     scale_size_discrete(range = c(3,6)) +
-    scale_colour_brewer(palette = "Dark2") +
-    scale_fill_distiller(palette = "Blues") +
+    scale_shape_manual(values = c(19, 18, 17, 15)) +
+    #scale_colour_viridis_d(option = "B", end = 0.9) +
+    scale_colour_brewer(palette = "Set1") +
     guides(
-      fill = "none",
-      colour = g,
-      size = g
+      colour = guide_legend(
+        override.aes = list(fill = NA, linewidth = 1), 
+        order = 1
+      ),
+      size = guide_legend(
+        override.aes = list(fill = NA), 
+        order = 2
+      ),
+      shape = guide_legend(
+        override.aes = list(fill = NA), 
+        order = 2
+      )
     ) +
     coord_sf(
       expand = FALSE,
-      xlim = c(-129, -122.5), 
+      xlim = c(-129, -123), 
       ylim = c(48, 51)
     ) +
+    labs(colour = "Indicator status") +
     theme(legend.background = element_blank())
 )
 
 
 # Alternate version with bathymetry added
-(cn_rivers_map_alt <- basemap2 +
+cn_rivers_map_alt <- basemap2 +
     geom_sf(
       data = stream_lines,
-      colour = "#08519C"
+      aes(colour = indicator_status)
+    ) +
+    # Overlay lakes on top of stream lines
+    geom_sf(
+      data = lakes,
+      fill = RColorBrewer::brewer.pal(4, "Blues")[1],
+      colour = NA
     ) +
     geom_sf(
       data = hatcheries,
-      aes(colour = `Hatchery program`, size = `Hatchery program`)
+      aes(shape = `Hatchery program`, size = `Hatchery program`)
     ) +
     geom_sf_label(
       data = filter(hatcheries, FacType2 == "OPS Hatchery"),
@@ -255,20 +330,33 @@ g <- guide_legend(override.aes = list(fill = NA))
       alpha = 0.8
     ) +
     scale_size_discrete(range = c(3,6)) +
-    scale_colour_brewer(palette = "Dark2") +
+    scale_shape_manual(values = c(19, 18, 17, 15)) +
+    scale_colour_viridis_d(option = "B", end = 0.85) +
+    #scale_colour_brewer(palette = "Set1") +
     scale_fill_distiller(palette = "Blues") +
-    guides(
-      fill = "none",
-      colour = g,
-      size = g
-    ) +
-    coord_sf(
+  guides(
+    fill = "none",
+    colour = guide_legend(
+      override.aes = list(fill = NA, linewidth = 1), 
+      order = 1
+    ),
+    size = guide_legend(
+      override.aes = list(fill = NA), 
+      order = 2
+    ),
+    shape = guide_legend(
+      override.aes = list(fill = NA), 
+      order = 2
+    )
+  ) +
+  coord_sf(
       expand = FALSE,
-      xlim = c(-129, -122.5), 
+      xlim = c(-129, -123), 
       ylim = c(48, 51)
     ) +
+    labs(colour = "Indicator status") +
     theme(legend.background = element_rect(colour = "black", fill = "white"))
-)
+
   
 
 # Export the plots
