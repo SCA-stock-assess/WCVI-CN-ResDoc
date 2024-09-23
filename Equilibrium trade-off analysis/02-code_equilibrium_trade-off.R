@@ -89,13 +89,12 @@ cu_params <- productivity |>
         log_a = rnorm(1000, mean = mean_log_a, sd = sd_log_a),
         srep = rnorm(1000, mean = mean_srep, sd = sd_srep)
       ) |> 
-        #filter(log_a > 0) |> 
         mutate(beta = log_a/srep) |> 
         crossing(U) |> 
         mutate(
           Seq = Seq(alpha = log_a, beta = beta, U = U),
           Heq = Heq(alpha = log_a, beta = beta, U = U),
-          across(Seq:Heq, ~if_else(U == 1, 0, .x))
+          #across(Seq:Heq, ~if_else(U == 1, 0, .x))
         )
     )  
   )
