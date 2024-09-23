@@ -29,7 +29,7 @@ cn_streams_list <- read_xlsx(
 ) |> 
   clean_names() |> 
   separate(
-    tributaries,
+    major_tributaries,
     sep = ", ",
     into = c("trib1", "trib2")
   ) |> 
@@ -55,11 +55,11 @@ stream_lines <- read_sf(
 ) |> 
   rename_with(str_to_lower) |> 
   # Remove some creeks that do not belong but match names in the list
-  filter(!gnis_name %in% c("Gold Creek", "Marble Creek", "Harris Creek")) |> 
+  filter(!(gnis_name == "Harris Creek" & bllnk == 354138111)) |> # Remove the second (wrong) Harris Ck
   mutate(
     # Some enumerated creeks are unnamed in the FWA
     gnis_new_name = case_when(
-      bllnk == 	354154385 ~ "Harris Creek", # FWA has two Harris Creeks on WCVI, this is the correct one
+      #bllnk == 354154385 ~ "Harris Creek", # FWA has two Harris Creeks on WCVI, this is the correct one
       bllnk == 354140796 ~ "Warn Bay Creek", 
       bllnk == 354141433 ~ "Chum Creek",
       bllnk == 354152375 ~ "Deserted Creek",
@@ -68,6 +68,7 @@ stream_lines <- read_sf(
       bllnk == 354151033 ~ "Easy Creek",
       bllnk == 354153393 ~ "McKay Cove Creek",
       bllnk == 354153029 ~ "Nasparti River",
+      bllnk == 354154631 ~ "Hoiss Creek",
       TRUE ~ gnis_name
     ) 
   ) |> 
@@ -81,7 +82,7 @@ stream_lines <- read_sf(
     indicator_status = 
       factor(
         indicator_status, 
-        levels = c("PSC indicator", "SEP major ops", "Intensive", "Extensive", "Non-indicator")
+        levels = c("PST indicator", "Intensive/Major Ops.", "Intensive", "Extensive", "Non-indicator")
       )
   )
 
@@ -259,7 +260,9 @@ g <- guide_legend(override.aes = list(fill = NA))
 (cn_rivers_map <- basemap1 +
     geom_sf(
       data = stream_lines,
-      aes(colour = indicator_status)
+      aes(colour = indicator_status),
+      lineend = "round",
+      linewidth = 0.2
     ) +
     # Overlay lakes on top of stream lines
     geom_sf(
@@ -278,7 +281,7 @@ g <- guide_legend(override.aes = list(fill = NA))
       vjust = 0,
       alpha = 0.8
     ) +
-    scale_size_discrete(range = c(3,6)) +
+    scale_size_discrete(range = c(2,5)) +
     scale_shape_manual(values = c(19, 18, 17, 15)) +
     #scale_colour_viridis_d(option = "B", end = 0.9) +
     scale_colour_brewer(palette = "Set1") +
@@ -310,7 +313,9 @@ g <- guide_legend(override.aes = list(fill = NA))
 cn_rivers_map_alt <- basemap2 +
     geom_sf(
       data = stream_lines,
-      aes(colour = indicator_status)
+      aes(colour = indicator_status),
+      lineend = "round",
+      linewidth = 0.2
     ) +
     # Overlay lakes on top of stream lines
     geom_sf(
@@ -329,10 +334,10 @@ cn_rivers_map_alt <- basemap2 +
       vjust = 0,
       alpha = 0.8
     ) +
-    scale_size_discrete(range = c(3,6)) +
+    scale_size_discrete(range = c(2,5)) +
     scale_shape_manual(values = c(19, 18, 17, 15)) +
-    scale_colour_viridis_d(option = "B", end = 0.85) +
-    #scale_colour_brewer(palette = "Set1") +
+    #scale_colour_viridis_d(option = "B", end = 0.85) +
+    scale_colour_brewer(palette = "Set1") +
     scale_fill_distiller(palette = "Blues") +
   guides(
     fill = "none",
