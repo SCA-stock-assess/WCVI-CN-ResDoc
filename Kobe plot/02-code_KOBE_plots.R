@@ -41,7 +41,7 @@ indicator_esc <- read_xlsx(
   na = "-"
   ) |> 
   clean_names() |> 
-  select(-x20) |> 
+  select(-x20) |> # Weird empty column at the end
   rename(
     "river" = stream_name,
     "escapement" = spawners,
@@ -70,12 +70,14 @@ to_infill <- trimmed_esc |>
 # List return years that received some enhancement during brood years
 enhancement_history <- trimmed_esc |> 
   filter(sep_releases > 500) |> # Some years received very little enhancement
+  # Assume that enhanced years will produce enhanced returns 3, 4, and 5 years later
   mutate(
     brood_year = year,
     return_year1 = year + 3,
     return_year2 = year + 4,
     return_year3 = year + 5
   ) |> 
+  # Reshape the data so all return years/populations have their own row
   pivot_longer(
     cols = contains("return_year"),
     names_prefix = "return_year",
@@ -130,6 +132,7 @@ pmax_eligible <- pmax_data |>
 pmax_neighbours <- to_infill |> 
   distinct(river) |> 
   # Manually assign neighbouring streams for pMAX 
+  # Note that neighbours are listed in order of proximity/preference (important)
   mutate(
     neighbours = case_when(
       river == "artlish_river" ~ list(c("kaouk_river", "tahsish_river")),
@@ -148,6 +151,7 @@ pmax_neighbours <- to_infill |>
       river == "zeballos_river" ~ list(c("leiner_river", "tahsis_river"))
     )
   ) |> 
+  # Split the list of neighbour populations into their own columns
   separate(
     neighbours,
     into = c("neighbour1", "neighbour2", "neighbour3"),
@@ -169,6 +173,7 @@ pmax_infill_logic <- to_infill |>
     enhancement_history,
     by = join_by(river == river, year == return_year)
   ) |> 
+  # Add columns showing what data are available for each neighbouring population
   left_join(
     rename(pmax_eligible, "data1" = data),
     by = join_by(neighbour1 == river, year == year)
@@ -185,6 +190,7 @@ pmax_infill_logic <- to_infill |>
   # Some rivers/years still have no good neighbour:
   {print(filter(., if_all(contains("data"), is.na)))} |> # Megin, Moyeha, and Bedwell in 1984
   mutate(
+    # We'll use the Sarita for these populations/years
     neighbour4 = if_else(
       str_detect(river, "bedwell|megin|moyeha") & year == 1984,
       "sarita_river",
@@ -195,6 +201,7 @@ pmax_infill_logic <- to_infill |>
     rename(pmax_eligible, "data4" = data),
     by = join_by(neighbour4 == river, year == year)
   ) |> 
+  # Lengthen data so each neighbour has its own row
   pivot_longer(
     matches("neighbour|data"),
     names_pattern = "(.+)(\\d)",
@@ -207,11 +214,15 @@ pmax_infill_logic <- to_infill |>
     .by = c(river, year),
     options = n(),
     choice = case_when(
-      options == 1 ~ "keep",
-      options > 1 & is.na(enhanced) & data == "yes" ~ "keep",
+      # If there is only one option, use that
+      options == 1 ~ "keep", 
+      # If not enhanced and neighbour not enhanced, use those data
+      options > 1 & is.na(enhanced) & data == "yes" ~ "keep", 
+      # Use enhanced returns to infill enhanced returns
       options > 1 & enhanced == "yes" & data == "yes - enhanced" ~ "keep",
+      # If there are only enhanced returns to infill unenhanced returns, we will use those
       options > 1 & is.na(enhanced) & all(data == "yes - enhanced") ~ "keep",
-      TRUE ~ "drop"
+      TRUE ~ "drop" # Drop everything else
     )
   )
 
@@ -230,14 +241,24 @@ infilled_esc <- pmax_infill_logic |>
   ) |> 
   # Add each system's own max value
   left_join(distinct(pmax_data, river, enhanced, max)) |> 
+  # Calculate infilled escapement value
   mutate(escapement = max * pmax) |> 
-  select(river, year, infill, escapement) |> 
+  select(river, year, infill, neighbour, escapement, pmax) |> 
+  # Collate with the not-infilled raw data
   bind_rows(
     trimmed_esc |> 
       filter(!is.na(escapement)) |> 
       select(river, year, escapement)
   )
   
+
+# Save data file with infilled escapement data
+write.csv(
+  infilled_esc,
+  file = here("Kobe plot", "R-OUT_infilled_indicators_escapement_timeseries.csv"),
+  row.names = FALSE
+)
+
   
 # Load ER data time series and build dataframe for Kobe plot ---------------
 
@@ -252,23 +273,23 @@ rch_er <- read.csv(here("Kobe plot", "01-data_2024ERA_MREERdata_11.06.2024.csv")
 # Reference points data set
 indicator_rp <- read_xlsx(
   here("Kobe plot", "01-data_FWA table update version 4 May30.xlsx"),
-  sheet = "RiverEscData",
+  sheet = "RiverEscData", # This sheet has all the reference point values
   skip = 2
 ) |> 
   clean_names() |> 
   select(cu, indicator, watershed, stream_name, matches("life_cycle|lc")) |> 
   rename("river" = stream_name) |> 
-  # Clean up river names
   mutate(
-    river = make_clean_names(river),
-    across(contains("lc"), as.numeric)
+    river = make_clean_names(river), # Clean up river names
+    across(contains("lc"), as.numeric) 
   ) |> 
   filter(river %in% indicator_names) |> 
+  # Summarize reference points across indicators to get SMU aggregate values
   summarize(
     smsy = sum(lc_smsy_median),
     srep = sum(lc_srep_median)
   ) |> 
-  # Calculate SR parameters
+  # Calculate Umsy
   mutate(
     alpha = exp((0.5-smsy/srep)/0.07),
     beta = log(alpha)/srep,
@@ -278,15 +299,17 @@ indicator_rp <- read_xlsx(
 
 # Make dataframe for KOBE plot
 kobe_data <- infilled_esc |> 
+  # Sum escapements across indicators for each year, and add the overall S/Umsy values
   summarize(
     .by = year,
     escapement = sum(escapement),
-    umsy_lc = indicator_rp$umsy,
-    smsy_lc = indicator_rp$smsy,
-    umsy_rr = 0.57,
-    smsy_rr = 18999
+    umsy_lc = indicator_rp$umsy, # Life cycle method
+    smsy_lc = indicator_rp$smsy, # Life cycle method
+    umsy_rr = 0.57, # Equilibrium trade-off method (from run reconstruction data)
+    smsy_rr = 18999 # Equilibrium trade-off method (from run reconstruction data)
   ) |> 
-  left_join(rch_er) |> 
+  left_join(rch_er) |> # Add ER time series
+  # Lengthen data so each method has its own row
   pivot_longer(
     matches("(u|s)msy"),
     names_sep = "_",
@@ -295,20 +318,15 @@ kobe_data <- infilled_esc |>
   mutate(
     x = escapement/smsy,
     y = er/umsy,
+    # Stipulate which quadrant each year belongs to 
     quadrant = case_when(
       y >= 1 & x <= 1 ~ 1,
-      y >= 1 & x > 1 ~ 5, # Nothing falls in this zone
+      y >= 1 & x > 1 ~ 5, 
       y < 1 & between(x,0.8,1) ~ 2, # Amber zone
       y < 1 & x <= 0.8 ~ 3,
       y < 1 & x > 1 ~ 4
     ) %>% factor(),
-    colour = case_when(
-      quadrant == 1 ~ "firebrick2",
-      quadrant == 2 ~ "darkgoldenrod1",
-      quadrant == 3 ~ "darkorange2",
-      quadrant == 4 ~ "springgreen3",
-      quadrant == 5 ~ "darkgoldenrod1" # Nothing falls in this quadrant
-    ),
+    # formal labels for each method
     method = factor(
       method, 
       levels = c("lc", "rr"), 
@@ -350,7 +368,7 @@ quadLabs <- data.frame(
 # Inspired by code from FSAR group
 (kobe_plots <- kobe_data |> 
     ggplot(aes(x, y)) +
-    facet_wrap(~method, nrow = 1) +
+    facet_wrap(~method, nrow = 1) + # Make one panel for each method
     #add "crosshairs"
     geom_vline(
       xintercept = 1, 
@@ -362,7 +380,7 @@ quadLabs <- data.frame(
       lty = 2,
       colour = "grey50"
     ) +
-    # Label Umsy on plot
+    # Label Umsy on plots
     geom_text(
       data = distinct(kobe_data, method, umsy),
       aes(
@@ -374,7 +392,7 @@ quadLabs <- data.frame(
       vjust = -0.5,
       parse = TRUE
     ) +
-    # Label Smsy on plot
+    # Label Smsy on plots
     geom_text(
       data = distinct(kobe_data, method, smsy),
       aes(
@@ -389,6 +407,7 @@ quadLabs <- data.frame(
     ) +
     geom_path(aes(alpha = year)) + #if you want to connect the dots
     geom_point(aes(color = year), size=3) +
+    # Add rectangle and text label for the 85% Smsy zone
     annotate(
       "rect", 
       xmin = 0.8, 
@@ -405,6 +424,7 @@ quadLabs <- data.frame(
       angle = 90,
       parse = TRUE
     ) +
+    # Add text labels at first and last year points
     geom_richtext(
       data = filter(kobe_data, year== min(year)|year== max(year)),
       aes(
@@ -413,7 +433,7 @@ quadLabs <- data.frame(
             paste0("'", str_sub(min(kobe_data$year), 3L)), 
             paste0("'", str_sub(max(kobe_data$year), 3L)) 
           ), 
-          each = 2
+          each = 2 # Depending on year order in input data, may need to delete "each =" 
         )
       ),
       hjust = 0-.2, 
@@ -421,6 +441,7 @@ quadLabs <- data.frame(
       label.colour = NA,
       fill = alpha("white", 0.75)
     ) +
+    # Add red circles around first and last year data points
     geom_point(
       data = filter(kobe_data, year== min(year)|year== max(year)),
       colour = "red",
@@ -428,6 +449,7 @@ quadLabs <- data.frame(
       size = 3,
       stroke = 1.25
     ) +
+    # Overlay text labels describing each quadrant
     geom_richtext(
       data = quadLabs, 
       aes(
@@ -437,6 +459,7 @@ quadLabs <- data.frame(
       label.colour = NA,
       fill = alpha("white", 0.75)
     ) +
+    # Constrain plot coordinates to spatially represent x and y equally
     coord_fixed(
       ratio = 1,
       xlim = c(0,2),
@@ -453,6 +476,7 @@ quadLabs <- data.frame(
     ) +
     scale_alpha(range = c(0.05, 0.85)) +
     guides(alpha = "none") +
+    # Fancy mathy axis labels
     labs(
       y = expression(frac(Exploitation~rate, U[MSY])), 
       x = expression(frac(Spawner~abundance,S[MSY])),
@@ -461,6 +485,7 @@ quadLabs <- data.frame(
     theme_bw(base_size = 12) +
     theme(
       legend.position = "top",
+      panel.spacing.x = unit(1.5, "lines"), # Move panels further apart
       panel.grid = element_blank()
     )
 )
