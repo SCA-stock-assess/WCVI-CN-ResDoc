@@ -84,6 +84,7 @@ cu_params <- productivity |>
   select(cu, matches("log_a|(?<!log)_srep", perl = TRUE)) |> 
   rowwise() |> 
   mutate(
+    # Bootstrapped productivity data for each CU
     data = list(
       tibble(
         log_a = rnorm(1000, mean = mean_log_a, sd = sd_log_a),
