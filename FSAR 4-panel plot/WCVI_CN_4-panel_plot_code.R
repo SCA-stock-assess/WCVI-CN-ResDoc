@@ -77,12 +77,22 @@ plots <- data |>
       lty = 2,
       linewidth = 0.5
     ) +
+    # Add inter-quartile confidence band around Umsy 
+    annotate(
+      "rect",
+      xmin = -Inf,
+      xmax = Inf,
+      ymin = 0.30,
+      ymax = 0.54,
+      fill = "blue",
+      alpha = 0.15
+    ) +
     annotate(
       "richtext",
       x = max(data$x, na.rm = TRUE),
       y = c(
         #0.565, 
-        0.445
+        0.43
         ),
       vjust = 0,
       hjust = 1,
@@ -92,7 +102,7 @@ plots <- data |>
       ),
       colour = c("blue"),
       label.colour = NA,
-      fill = alpha("white", alpha = 0.8),
+      fill = NA,
       size = 2.5
     )
 )
