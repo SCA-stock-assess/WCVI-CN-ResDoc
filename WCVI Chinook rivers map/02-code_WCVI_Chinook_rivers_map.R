@@ -38,7 +38,7 @@ cn_streams_list <- read_xlsx(
     values_to = "stream",
     values_drop_na = TRUE
   ) |> 
-  select(cu, pfma, indicator_status, designation, stream)
+  select(cu, pfma, indicator_status, stream)
 
 
 # Extract column of stream names as a character vector
