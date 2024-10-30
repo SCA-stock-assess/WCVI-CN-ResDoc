@@ -1,0 +1,205 @@
+[
+	{
+		"title" : "Freshwater Atlas Lakes",
+		"name" : "freshwater-atlas-lakes",
+		"bcdc_data_resource_url" : "https://catalogue.data.gov.bc.ca/dataset/cb1e3aba-d3fe-4de1-a2d4-b8b6650fb1f6",
+		"description" : "All lake polygons for the province",
+		"purpose" : "This spatially-based information is typically used in allocation decisions, boundary definitions, planning processes and environmental monitoring, by internal and external stakeholders.",
+		"bcdc_type" : "Geographic",
+		"last_modified" : "2024-02-24T09:36:31",
+		"resource_storage_location" : "Bc Geographic Warehouse",
+		"object_name" : "WHSE_BASEMAPPING.FWA_LAKES_POLY",
+		"object_short_name" : "FWLKSPL",
+		"object_table_comments" : "Contains all lake polygons for the province.  Does not contain multipart geometries.  Spatial type: simple polygon",
+		"projection_name" : "epsg3005",
+		"license_title" : "Open Government Licence - British Columbia",
+		"license_url" : "https://www2.gov.bc.ca/gov/content?id=A519A56BC2BF44E4A008B33FCF527F61",
+		"details" : [
+			{
+				"column_name" : "WATERBODY_POLY_ID",
+				"column_comments" : "The WATERBODY POLY ID is the unique key for the waterbody polygon spatial layer. It is not applied to the warehouse model only, i.e., it originates with the source FWA system.",
+				"short_name" : "WTRBDPLD",
+				"data_type" : "NUMBER",
+				"data_precision" : "18"
+			},
+			{
+				"data_type" : "NUMBER",
+				"data_precision" : "18",
+				"column_name" : "WATERSHED_GROUP_ID",
+				"column_comments" : "An automatically generate id that uniquely identifies the watershed group feature.",
+				"short_name" : "WTRSHDGRPD"
+			},
+			{
+				"data_type" : "VARCHAR2",
+				"column_comments" : "The type of waterbody. Possible values include: 'L' (lake), 'R' (double lined river), 'W' (wetland),  'X' (manmade river or lake), or 'G' (glacier or icefield).",
+				"column_name" : "WATERBODY_TYPE",
+				"short_name" : "WTRBDTP",
+				"data_precision" : "1"
+			},
+			{
+				"short_name" : "WTRBDK",
+				"column_comments" : "A unique identifier associated with waterbodies in order to group polygons that make up a single waterbody.",
+				"column_name" : "WATERBODY_KEY",
+				"data_type" : "NUMBER",
+				"data_precision" : "10"
+			},
+			{
+				"data_type" : "NUMBER",
+				"column_name" : "AREA_HA",
+				"short_name" : "AREA_HA",
+				"column_comments" : "Area of polygon (hectares).",
+				"data_precision" : "38"
+			},
+			{
+				"data_type" : "NUMBER",
+				"short_name" : "GNIS_ID_1",
+				"column_name" : "GNIS_ID_1",
+				"column_comments" : "A BCGNIS (BC Geographical Names Information System)  feature id attached to a waterbody or island, if applicable. In a grouped system the feature id of the BCGNIS group is provided here and any subsequent names provided in gnis_id2 and gnis_id3.  Note:  For Vancouver Island, Graham Island, and Moresby Island the names are not attached to the label points.",
+				"data_precision" : "10"
+			},
+			{
+				"data_type" : "VARCHAR2",
+				"short_name" : "GNSNM1",
+				"column_name" : "GNIS_NAME_1",
+				"column_comments" : "The name of the first BCGNIS  (BC Geographical Names Information System)  feature id (an English name was used where available, otherwise another language was selected).",
+				"data_precision" : "80"
+			},
+			{
+				"data_type" : "NUMBER",
+				"column_name" : "GNIS_ID_2",
+				"column_comments" : "A second BCGNIS (BC Geographical Names Information System) feature id attached to a waterbody or island, if applicable.",
+				"short_name" : "GNIS_ID_2",
+				"data_precision" : "10"
+			},
+			{
+				"data_type" : "VARCHAR2",
+				"column_comments" : "The name of the second BCGNIS (BC Geographical Names Information System) feature id (an English name was used where available, otherwise another language was selected).",
+				"column_name" : "GNIS_NAME_2",
+				"data_precision" : "80",
+				"short_name" : "GNSNM2"
+			},
+			{
+				"column_comments" : "A third BCGNIS  (BC Geographical Names Information System) feature id attached to a waterbody or island, if applicable.",
+				"column_name" : "GNIS_ID_3",
+				"short_name" : "GNIS_ID_3",
+				"data_type" : "NUMBER",
+				"data_precision" : "10"
+			},
+			{
+				"column_name" : "GNIS_NAME_3",
+				"data_type" : "VARCHAR2",
+				"column_comments" : "The name of the third BCGNIS  (BC Geographical Names Information System) feature id (an English name was used where available, otherwise another language was selected).",
+				"short_name" : "GNSNM3",
+				"data_precision" : "80"
+			},
+			{
+				"data_type" : "NUMBER",
+				"column_name" : "BLUE_LINE_KEY",
+				"short_name" : "BLLNK",
+				"column_comments" : "The blue line key of the controlling route through the waterbody.",
+				"data_precision" : "10"
+			},
+			{
+				"data_type" : "NUMBER",
+				"column_comments" : "The watershed key of the controlling rout through the waterbody.",
+				"column_name" : "WATERSHED_KEY",
+				"short_name" : "WTRSHDK",
+				"data_precision" : "10"
+			},
+			{
+				"data_type" : "VARCHAR2",
+				"data_precision" : "143",
+				"short_name" : "FWWTRSHDCD",
+				"column_name" : "FWA_WATERSHED_CODE",
+				"column_comments" : "The watershed code of the controlling route through the waterbody."
+			},
+			{
+				"short_name" : "LCLWTRSHDC",
+				"data_type" : "VARCHAR2",
+				"column_comments" : "The local watershed code associated with the waterbody.",
+				"data_precision" : "143",
+				"column_name" : "LOCAL_WATERSHED_CODE"
+			},
+			{
+				"column_name" : "WATERSHED_GROUP_CODE",
+				"short_name" : "WTRSHDGRPC",
+				"data_type" : "VARCHAR2",
+				"column_comments" : "The watershed group codeof the watershed the feature is contained within.",
+				"data_precision" : "4"
+			},
+			{
+				"data_precision" : "7",
+				"data_type" : "VARCHAR2",
+				"column_comments" : "A value attributed via the watershed code to all waterbodies indicating on what side of the watershed they drain into.",
+				"column_name" : "LEFT_RIGHT_TRIBUTARY",
+				"short_name" : "LFTRGHTTRB"
+			},
+			{
+				"data_type" : "NUMBER",
+				"column_name" : "WATERBODY_KEY_50K",
+				"data_precision" : "10",
+				"short_name" : "WTRBDK50K",
+				"column_comments" : "The 'best' matched waterbody from the 1:50K Watershed Atlas.  In cases where there are multiple matches to features in the 1:50K watershed atlas the match with the greatest overlapping area was used."
+			},
+			{
+				"data_type" : "VARCHAR2",
+				"column_comments" : "The group code from the 1:50K Watershed Atlas associated with the waterbody key 50k.",
+				"column_name" : "WATERSHED_GROUP_CODE_50K",
+				"short_name" : "WTRSHDGRP1",
+				"data_precision" : "4"
+			},
+			{
+				"data_type" : "VARCHAR2",
+				"column_name" : "WATERBODY_KEY_GROUP_CODE_50K",
+				"short_name" : "WTRBDKGRPC",
+				"column_comments" : "The waterbody key 50K with the group code 50K concatenated.",
+				"data_precision" : "55"
+			},
+			{
+				"data_type" : "VARCHAR2",
+				"column_comments" : "The 1:50K Watershed Atlas watershed code associated with the waterbody key 50K.",
+				"short_name" : "WTRSHDCD50",
+				"column_name" : "WATERSHED_CODE_50K",
+				"data_precision" : "45"
+			},
+			{
+				"data_type" : "VARCHAR2",
+				"column_comments" : "FEATURE CODE contains a value based on the Canadian Council of Surveys and Mapping's (CCSM) system for classification of geographic features.",
+				"column_name" : "FEATURE_CODE",
+				"short_name" : "FTRCD",
+				"data_precision" : "10"
+			},
+			{
+				"data_type" : "SDO_GEOMETRY",
+				"column_name" : "GEOMETRY",
+				"short_name" : "GEOMETRY",
+				"data_precision" : "1"
+			},
+			{
+				"data_type" : "NUMBER",
+				"data_precision" : "38",
+				"short_name" : "OBJECTID",
+				"column_name" : "OBJECTID"
+			},
+			{
+				"data_type" : "BLOB",
+				"column_name" : "SE_ANNO_CAD_DATA",
+				"data_precision" : "4000"
+			},
+			{
+				"data_type" : "NUMBER",
+				"column_comments" : "FEATURE_AREA_SQM is the system calculated area of a two-dimensional polygon in square meters",
+				"short_name" : "AREA_SQM",
+				"column_name" : "FEATURE_AREA_SQM",
+				"data_precision" : "19"
+			},
+			{
+				"data_type" : "NUMBER",
+				"data_precision" : "19",
+				"short_name" : "FEAT_LEN",
+				"column_name" : "FEATURE_LENGTH_M",
+				"column_comments" : "FEATURE_LENGTH_M is the system calculated length or perimeter of a geometry in meters"
+			}
+		]
+	}
+]

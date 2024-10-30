@@ -1,0 +1,95 @@
+All_Adult_Biosampling_2020_Burman_R_Fall_Chinook.xlsx
+All_Adult_Biosampling_2020_Conuma_R_Fall_Chinook.xlsx
+All_Adult_Biosampling_2020_Nahmint_R_Fall_Chinook.xlsx
+All_Adult_Biosampling_2020_Robertson_Cr_Fall_Chinook.xlsx
+All_Adult_Biosampling_2020_Sarita_R_Fall_Chinook.xlsx
+All_Adult_Biosampling_ALL FACILITIES WITH RESULTS 2021-2023.xlsx
+	- Files downloaded from DFO's "EPRO" database, the central database for all data collected from DFO hatcheries.
+	- Bit of a mishmash between some individual year/stock files (for 2020) and a compilation made by a stock assessment biologist of all
+	  stock data from 2021-2023. 
+	- These files reflect the state of the EPRO database at the time the analysis was conducted. Only data from 2020-2023 had been added,
+	  and not even all stocks were available for 2020. More data are likely to be available from EPRO in future. Historic data from pre-2020
+	  came from ENPRO and were compiled by a stock assessment technician circa 2019. See the file "ENPRO-etc_CNLenth_Data_1992-2018.xlsx"
+
+BC Coastline
+	- Folder containing high resolution shapefile of the BC coastline
+
+CREST_1981-1989_WCVI_CN_biological-data-with-results.xlsx
+[...]
+CREST_2023_WCVI_CN_biological-data-with-results.xlsx
+	- Annual(ish) data files containing all Chinook sampled in the WCVI creel program.
+	- Used in the analysis of size-at-age declines in WCVI Chinook under Chapter 5 of the Research Document. 
+
+CTC_2024ERA_MREERdata_11.06.2024.csv
+	- Mature-run-adjusted exploitation rate data (on Robertson Creek Hatchery CWTs) provided by the Chinook Technical Committee.
+	- Used in the Kobe plots
+
+CTC_OUT File Export 20230311_AllStocks.xlsx
+	- Data file provided by the Chinook Technical Committee containing results of its annual cohort analyses spanning from 1971-2020 brood years.
+	- Contains two tabs, "BROOD YEAR METHOD" and "CALENDAR YEAR METHOD." These are two different ways of grouping the CWT "cohorts." Analyses herein
+	  use the brood year method.
+
+CWT_run_timing_NWVI-SWVI.csv
+	- Data file containing CWT recoveries from outer areas of Nootka Sound of all WCVI hatchery stocks from 1991-2015.
+	- Used to create Figure 3.5 in the Research Document
+
+ENPRO-etc_CNLenth_Data_1992-2018.xlsx
+	- The exact source of all these data is unknown, but the file was compiled by a stock assessment technician circa 2018. The purpose
+	  appears to have been to determine a conversion factor between different length measurements commonly collected from Chinook
+	  across different sampling programs. 
+	- The majority of records appear to have come from "ENPRO" database, DFO's old database for all data collected from hatcheries. EPRO
+	  is the new database. See notes for "All_Adult_Biosampling[...]" files, above.
+
+FSAR_4-panel_data.xlsx
+	- Time series data on ocean catch, exploitation rate, and spawner abundance for Figure 1 in the FSAR document
+
+FWA_LAKES_POLY
+	- Folder containing lake polygon files from the BC Freshwater Atlas https://www2.gov.bc.ca/gov/content/data/geographic-data-services/topographic-data/freshwater
+
+FWA_STREAM_NETWORKS_SP
+	- Folder containing stream linestring files from the BC Freshwater Atlas https://www2.gov.bc.ca/gov/content/data/geographic-data-services/topographic-data/freshwater
+
+FWA table update version 4 April17.xlsx
+FWA table update version 4 May30.xlsx
+	- Excel files containing numerous data related to spawner abundances and benchmark values for WCVI Chinook populations
+	- several tables and sections in the Research Document are built on data in these files
+	- The Kobe plot is also built on these data
+
+Hatchery_locations_shp
+	- Folder containing spatial point data for DFO SEP hatcheries
+
+Historic_RCH_female_CN_data_from_biodatabase.xlsx
+	- A data dump from a defunct database (known as the "Biodatabase") that contains all biosamples that are from Robertson Creek Hatchery
+	  female Chinook.
+	- Another loose data source that was added to the heap for investing trends in size-at-age for Chapter 5 in the Research Document.
+
+PRC2638.txt
+	- A data dump file from the RMIS CWT recoveries database. 
+	- Used in the map of marine CWT recoveries in Chapter 3 of the Research Document
+
+RCH_CWT_survival_data.csv
+	- Survival rates for Robertson Creek Hatchery/Stamp River Chinook from two sources: the Chinook Technical Committee's annual cohort analysis,
+	  and from analysis of run reconstruction data of Stamp River natural spawners (see the file: )
+	- Used to make Figure 3.9 in the Research Document
+
+RMIS_fishery_names.csv
+	- Lookup key for fishery codes in RMIS dump file (PRC2638.txt, see above)
+	- Used in the map of marine CWT recoveries in Chapter 3 of the Research Document
+
+WCVI_bathy_NOAA.tiff
+	- Data dump of bathymetry for the WCVI area from NOAA's NCEI database https://www.ncei.noaa.gov/maps/bathymetry/ 
+	- Used to make an alternative version of the WCVI Chinook Rivers Map in section 2 of the Research Document
+
+WCVI_CN_streams_master_list.xlsx
+	- The master list of Chinook populations on the WCVI with some high-level summary data for each population
+	- Used to make the WCVI Chinook Rivers Map in section 2 of the Research Document
+	- Also used to generate Tables C2 and C3 (appendix data tables) in the Research Document
+	- Also contains analysis from Chapter 5 in the Research Document evaluating sets of the populations against aggregate reference points
+
+WCVI_Escapement-FSC_BioData_2012-2024_WithResults.xlsx
+	- An excel "database" kept updated by stock assessment staff that contains data from Chinook that were sampled but do not have a 
+	  dedicated database to be entered into. These are known as "orphan" biodata. 
+
+WCVI_hatchery_Chinook_fecundity_data_2021-2023.csv
+	- Data from fecundity sampling project carried out at Robertson Creek Hatchery (2021 & 2023) and Conuma River Hatchery (2022).
+	- These data are used to support some statements in the Research Document but are not directly used in any R analyses. 
