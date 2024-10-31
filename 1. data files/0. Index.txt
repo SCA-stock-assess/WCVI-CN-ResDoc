@@ -15,7 +15,7 @@ BC Coastline
 	- Folder containing high resolution shapefile of the BC coastline
 
 CREST_1981-1989_WCVI_CN_biological-data-with-results.xlsx
-[...]
+[...] *18 similar files*
 CREST_2023_WCVI_CN_biological-data-with-results.xlsx
 	- Annual(ish) data files containing all Chinook sampled in the WCVI creel program.
 	- Used in the analysis of size-at-age declines in WCVI Chinook under Chapter 5 of the Research Document. 
@@ -75,6 +75,10 @@ RCH_CWT_survival_data.csv
 RMIS_fishery_names.csv
 	- Lookup key for fishery codes in RMIS dump file (PRC2638.txt, see above)
 	- Used in the map of marine CWT recoveries in Chapter 3 of the Research Document
+
+Somass_nat-spawners_ts.xlsx
+	- Analysis of Stamp River natural smolt mortality rates based on total returns to the river and otolith thermal mark sampling
+	- Used in Chapter 3 of the Research Document 
 
 WCVI_bathy_NOAA.tiff
 	- Data dump of bathymetry for the WCVI area from NOAA's NCEI database https://www.ncei.noaa.gov/maps/bathymetry/ 
