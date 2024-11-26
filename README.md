@@ -11,4 +11,4 @@ https://www.dfo-mpo.gc.ca/fisheries-peches/consultation/consult-maj-pri-eng.html
 
 Much of the work in this repository provides direct supporting information to the CSAS Research Document, which in turn informs the FSAR.
 
-Each folder corresponds to a specific analysis or figure in the Research Document and contains all supporting data and code. 
+Each R script corresponds to a specific analysis or figure in the Research Document or FSAR.
