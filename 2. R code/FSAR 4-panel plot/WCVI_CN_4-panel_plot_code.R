@@ -1,10 +1,11 @@
 # Packages ----------------------------------------------------------------
 
-pkgs <- c("readxl", "tidyverse", "ggpubr", "here", "janitor")
+pkgs <- c("readxl", "tidyverse", "ggpubr", "here", "janitor", "geomtextpath")
 #install.packages(pkgs)
 
 library(here)
 library(tidyverse); theme_set(theme_bw(base_size = 8))
+library(geomtextpath)
 library(janitor)
 library(readxl)
 library(ggpubr)
@@ -150,37 +151,28 @@ plots <- data |>
 # Make specific adjustments to each panel
 (plots[[3]] <- plots[[3]] +
     scale_y_continuous(labels = scales::percent) +
-    annotate(
-      "richtext",
-      x = max(data$x, na.rm = TRUE),
-      y = c(
-        #0.565, 
-        0.43
-      ),
-      vjust = 0,
-      hjust = 1,
-      label = c(
-        #"*U*<sub>MSY</sub> based on moderate productivity",
-        "*U*<sub>MSY</sub> based on low productivity"
-      ),
-      colour = c("black"),
-      label.colour = NA,
-      fill = alpha("white", 0.8),
-      size = 2.5
-    ) +
-    geom_hline(
-      yintercept = c(0.44),
-      colour = c("black"),
+    # Add labelled horizontal reference line for Umsy
+    geom_labelhline(
+      yintercept = Umsy,
+      label = "*U*<sub>MSY</sub> based on low productivity",
+      hjust = 0.1,
+      rich = TRUE,
+      colour = "black",
+      fill = "white",
+      boxcolor = NA,
+      alpha = 0.8,
       lty = 2,
-      linewidth = 0.5
+      linewidth = 0.4,
+      size = 2.5,
+      label.padding = unit(0.05, "lines")
     ) +
     # Add inter-quartile confidence band around Umsy 
     annotate(
       "rect",
       xmin = -Inf,
       xmax = Inf,
-      ymin = 0.30,
-      ymax = 0.54,
+      ymin = Umsy_lci,
+      ymax = Umsy_uci,
       fill = "black",
       alpha = 0.10
     ) 
@@ -188,40 +180,61 @@ plots <- data |>
 
 
 (plots[[1]] <- plots[[1]] +
-    annotate(
-      "richtext",
-      x = min(data$x, na.rm = TRUE),
-      y = c(
-        Smsy_17*0.85, Sgen_17
-        #,Smsy_7*0.85, Sgen_7
-        )+250,
-      vjust = 0,
-      hjust = 0,
-      label = c(
-        "85% *S*<sub>MSY</sub> based on low productivity",
-        "*S*<sub>gen</sub> based on low productivity"
-        #,"85% *S*<sub>MSY</sub> based on low productivity",
-        #"*S*<sub>gen</sub> based on low productivity"
-      ),
-      colour = c(
-        "black", "black"
-        #,"grey50", "grey50"
-      ),
-      label.colour = NA,
-      fill = alpha("white", alpha = 0.8),
-      size = 2.5
-    ) +
-    geom_hline(
-      yintercept = c(
-        Smsy_17*0.85, Sgen_17
-        #,Smsy_7*0.85, Sgen_7
-      ),
-      colour = c(
-        "black", "black"
-        #,"grey70", "grey70"
-      ),
+    geom_labelhline(
+      yintercept = Smsy_17*0.85,
+      hjust = 0.1,
+      colour = "black",
+      label = "85% *S*<sub>MSY</sub> based on low productivity",
+      rich = TRUE,
+      fill = "white",
+      boxcolor = NA,
+      alpha = 0.8,
       lty = 2,
-      linewidth = 0.5
+      linewidth = 0.4,
+      size = 2.5,
+      label.padding = unit(0.05, "lines")
+    ) +
+    geom_labelhline(
+      yintercept = Sgen_17,
+      hjust = 0.1,
+      colour = "black",
+      label = "*S*<sub>gen</sub> based on low productivity",
+      rich = TRUE,
+      fill = "white",
+      boxcolor = NA,
+      alpha = 0.8,
+      lty = 2,
+      linewidth = 0.4,
+      size = 2.5,
+      label.padding = unit(0.05, "lines")
+    ) +
+    geom_labelhline(
+      yintercept = Smsy_7*0.85,
+      hjust = 0.1,
+      colour = "grey50",
+      label = "85% *S*<sub>MSY</sub> based on low productivity",
+      rich = TRUE,
+      fill = "white",
+      boxcolor = NA,
+      alpha = 0.8,
+      lty = 2,
+      linewidth = 0.3,
+      size = 1.5,
+      label.padding = unit(0.05, "lines")
+    ) +
+    geom_labelhline(
+      yintercept = Sgen_7,
+      hjust = 0.1,
+      colour = "grey50",
+      label = "*S*<sub>gen</sub> based on low productivity",
+      rich = TRUE,
+      fill = "white",
+      boxcolor = NA,
+      alpha = 0.8,
+      lty = 2,
+      linewidth = 0.3,
+      size = 1.5,
+      label.padding = unit(0.05, "lines")
     ) 
 )
 
