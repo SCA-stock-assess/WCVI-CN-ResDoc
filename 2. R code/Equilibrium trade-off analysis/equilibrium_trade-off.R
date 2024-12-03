@@ -1,12 +1,13 @@
 # Packages ----------------------------------------------------------------
 
-pkgs <- c("tidyverse", "here", "readxl", "janitor")
+pkgs <- c("tidyverse", "here", "readxl", "janitor", "gsl")
 #install.packages(pkgs)
 
 library(here)
 library(tidyverse)
 library(readxl)
 library(janitor)
+library(gsl) # For Lambert's W function used to calculate Umsy
 
 
 # Disable scientific notation in outputs
@@ -48,7 +49,15 @@ productivity <- tribble(
   unnest(beta)
 
 
-# Define functions for calculating Srep and Heq ----------------------------
+# Define functions for calculating Umsy, Srep, and Heq ----------------------------
+
+
+# Umsy using Scheuerell (2016) explicit solution
+Umsy <- function(alpha) {
+  
+  Umsy = 1 - gsl::lambert_W0(exp(1-alpha))
+  
+}
 
 
 # Seq - equilibrium population escapement at fixed harvest rate
@@ -105,7 +114,7 @@ cu_params <- productivity |>
 umsy_vals <- cu_params |> 
   unnest(data) |> 
   distinct(cu, log_a, beta) |> 
-  mutate(umsy = beta * ((log_a*(0.5-0.07*log_a))/beta)) |> 
+  mutate(umsy = Umsy(log_a)) |> 
   summarise(
     .by = cu,
     umsy_mid = median(umsy),
