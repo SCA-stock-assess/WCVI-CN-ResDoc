@@ -304,3 +304,50 @@ ggsave(
 )
 
 
+
+
+# Compile and save table of key output values -----------------------------
+
+
+# Smsy values are already saved in a dataframe for the trade-off plot
+eq_outputs <- smsy_lab |> 
+  select(-label) |> 
+  pivot_longer(everything()) |> 
+  # Manually add Umsy values and Heq lwr/upr
+  add_row(
+    name = c(
+      "Heq_lwr",
+      "Heq_upr",
+      "Umsy_mid",
+      "Umsy_lwr",
+      "Umsy_upr"
+    ),
+    value = c(
+      lwr_Heq_Smsy,
+      upr_Heq_Smsy,
+      eq_sum_data$U[eq_sum_data$Heq_mid == mid_Heq_Smsy],
+      eq_sum_data$U[eq_sum_data$Heq_lwr == lwr_Heq_Smsy],
+      eq_sum_data$U[eq_sum_data$Heq_upr == upr_Heq_Smsy]
+    )
+  ) |> 
+  separate(
+    name,
+    c("variable", "increment"),
+    sep = "_"
+  ) |> 
+  pivot_wider(
+    names_from = increment,
+    values_from = value
+  )
+
+
+# Save the output table of key values
+write.csv(
+  eq_outputs,
+  here(
+    "3. R outputs", 
+    "Equilibrium trade-off analysis", 
+    "R-OUT_SMU_ref-pt_values_eq-trade-off.csv"
+  ),
+  row.names = FALSE
+)
