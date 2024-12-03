@@ -2,7 +2,7 @@
 
 pkgs <- c(
   'tidyverse','RColourBrewer','gganimate','ggrepel',
-  'readxl', 'writexl','janitor', 'here', "ggtext"
+  'readxl', 'writexl','janitor', 'here', "ggtext", "gsl"
 )
 #install.packages(pkgs)
 
@@ -15,6 +15,7 @@ library(gganimate)
 library(ggrepel)
 library(readxl)
 library(here)
+library(gsl)
 
 
 # Load ER data time series and build dataframe for Kobe plot ---------------
@@ -32,7 +33,7 @@ rch_er <- read.csv(
   rename("er" = 2)
 
 
-# Reference points data set
+# Reference points data set for individual rivers
 indicator_rp <- read_xlsx(
   here(
     "1. data files", 
@@ -48,19 +49,33 @@ indicator_rp <- read_xlsx(
     river = make_clean_names(river), # Clean up river names
     across(contains("lc"), as.numeric) 
   ) |> 
-  filter(river %in% indicator_names) |> 
+  filter(indicator %in% c("Ind10", "Ind7")) |> 
   # Summarize reference points across indicators to get SMU aggregate values
   summarize(
     smsy = sum(lc_smsy_median),
     srep = sum(lc_srep_median)
   ) |> 
-  # Calculate Umsy
-  mutate(
-    alpha = exp((0.5-smsy/srep)/0.07),
-    beta = log(alpha)/srep,
-    umsy = (0.5*log(alpha)) - (0.07*(log(alpha))^2),
-  )
+  # Calculate Umsy using explicit solution from Scheuerell (2016)
+  mutate(umsy = 1 - gsl::lambert_W0(exp(1-1)))
   
+
+# Reference points at SMU level from equilibrium trade-off analysis
+rp_eq <- here(
+  "3. R outputs",
+  "Equilibrium trade-off analysis",
+  "R-OUT_SMU_ref-pt_values_eq-trade-off.csv"
+) |> 
+  read.csv()
+
+
+# Time series of indicator escapement from infilling
+infilled_esc <- here(
+  "3. R outputs",
+  "Escapement infill",
+  "R-OUT_infilled_indicators_escapement_timeseries.csv"
+) |> 
+  read.csv()
+
 
 # Make dataframe for KOBE plot
 kobe_data <- infilled_esc |> 
@@ -70,8 +85,8 @@ kobe_data <- infilled_esc |>
     escapement = sum(escapement),
     umsy_lc = indicator_rp$umsy, # Life cycle method
     smsy_lc = indicator_rp$smsy, # Life cycle method
-    umsy_rr = 0.57, # Equilibrium trade-off method (from run reconstruction data)
-    smsy_rr = 18999 # Equilibrium trade-off method (from run reconstruction data)
+    umsy_rr = rp_eq$mid[rp_eq$variable == "Umsy"], # Equilibrium trade-off method
+    smsy_rr = rp_eq$mid[rp_eq$variable == "Smsy"] # Equilibrium trade-off method
   ) |> 
   left_join(rch_er) |> # Add ER time series
   # Lengthen data so each method has its own row
@@ -162,7 +177,7 @@ quadLabs <- data.frame(
     geom_text(
       data = distinct(kobe_data, method, smsy),
       aes(
-        label = paste0("S[MSY]==", smsy),
+        label = paste0("S[MSY]==", round(smsy, 0)),
         x = 1,
         y = 1.5
       ),
