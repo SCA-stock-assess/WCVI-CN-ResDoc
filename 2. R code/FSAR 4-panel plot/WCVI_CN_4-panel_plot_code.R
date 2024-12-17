@@ -154,7 +154,7 @@ plots <- data |>
     # Add labelled horizontal reference line for Umsy
     geom_labelhline(
       yintercept = Umsy,
-      label = "*U*<sub>MSY</sub> based on low productivity",
+      label = "*U*<sub>MSY</sub>",
       hjust = 0.1,
       rich = TRUE,
       colour = "black",
@@ -182,9 +182,9 @@ plots <- data |>
 (plots[[1]] <- plots[[1]] +
     geom_labelhline(
       yintercept = Smsy_17*0.85,
-      hjust = 0.1,
+      hjust = 0.13,
       colour = "black",
-      label = "85% *S*<sub>MSY</sub> based on low productivity",
+      label = "85% *S*<sub>MSY</sub>",
       rich = TRUE,
       fill = "white",
       boxcolor = NA,
@@ -194,48 +194,48 @@ plots <- data |>
       size = 2.5,
       label.padding = unit(0.05, "lines")
     ) +
-    geom_labelhline(
-      yintercept = Sgen_17,
-      hjust = 0.1,
-      colour = "black",
-      label = "*S*<sub>gen</sub> based on low productivity",
-      rich = TRUE,
-      fill = "white",
-      boxcolor = NA,
-      alpha = 0.8,
-      lty = 2,
-      linewidth = 0.4,
-      size = 2.5,
-      label.padding = unit(0.05, "lines")
-    ) +
+    # geom_labelhline(
+    #   yintercept = Sgen_17,
+    #   hjust = 0.1,
+    #   colour = "black",
+    #   label = "*S*<sub>gen</sub> based on low productivity",
+    #   rich = TRUE,
+    #   fill = "white",
+    #   boxcolor = NA,
+    #   alpha = 0.8,
+    #   lty = 2,
+    #   linewidth = 0.4,
+    #   size = 2.5,
+    #   label.padding = unit(0.05, "lines")
+    # ) +
     geom_labelhline(
       yintercept = Smsy_7*0.85,
-      hjust = 0.1,
+      hjust = 0.13,
       colour = "grey50",
-      label = "85% *S*<sub>MSY</sub> based on low productivity",
+      label = "85% *S*<sub>MSY</sub>",
       rich = TRUE,
       fill = "white",
       boxcolor = NA,
       alpha = 0.8,
       lty = 2,
       linewidth = 0.3,
-      size = 1.5,
+      size = 2,
       label.padding = unit(0.05, "lines")
-    ) +
-    geom_labelhline(
-      yintercept = Sgen_7,
-      hjust = 0.1,
-      colour = "grey50",
-      label = "*S*<sub>gen</sub> based on low productivity",
-      rich = TRUE,
-      fill = "white",
-      boxcolor = NA,
-      alpha = 0.8,
-      lty = 2,
-      linewidth = 0.3,
-      size = 1.5,
-      label.padding = unit(0.05, "lines")
-    ) 
+    ) #+
+    # geom_labelhline(
+    #   yintercept = Sgen_7,
+    #   hjust = 0.1,
+    #   colour = "grey50",
+    #   label = "*S*<sub>gen</sub> based on low productivity",
+    #   rich = TRUE,
+    #   fill = "white",
+    #   boxcolor = NA,
+    #   alpha = 0.8,
+    #   lty = 2,
+    #   linewidth = 0.3,
+    #   size = 1.5,
+    #   label.padding = unit(0.05, "lines")
+    # ) 
 )
 
 
