@@ -14,7 +14,7 @@ library(janitor)
 # Load and plot data ------------------------------------------------------
 
 
-# File is stored under Kobe plot folder
+# File is stored under FWA table workings
 full_ts <- here(
   "1. data files",
   "FWA table update version 4 April17.xlsx"
@@ -180,3 +180,18 @@ ggsave(
   units = "in"
 )
 
+
+# Export data as a table for Rebuilding Plan accessibility requirements
+full_ts |> 
+  summarize(
+    .by = c(brood_year, indicator, era),
+    spawners = sum(spawners, na.rm = TRUE)
+  ) |> 
+  pivot_wider(
+    names_from = indicator,
+    values_from = spawners
+  ) |> 
+  write.table(
+    "clipboard",
+    row.names = FALSE
+  )
