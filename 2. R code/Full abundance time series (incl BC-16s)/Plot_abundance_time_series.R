@@ -195,3 +195,67 @@ full_ts |>
     "clipboard",
     row.names = FALSE
   )
+
+
+
+# Version française -------------------------------------------------------
+
+
+
+# Alternative plot where alpha shows fishery officer counts
+(ts_alpha_fr <- full_ts |> 
+   mutate(
+     indicator_fr = factor(
+       indicator,
+       labels = c(
+         "Indicateurs étendus",
+         "7 indicateurs de population sauvage",
+         "10 indicateurs intensifs",
+         "Réseaux des opérations majeures du PMVS"
+       )
+     )
+   ) |> 
+   ggplot(aes(x = brood_year, y = spawners)) +
+  geom_col(
+    aes(
+      fill = fct_rev(indicator_fr),
+      alpha = fct_rev(era)
+    )
+  ) +
+  scale_y_continuous(
+    expand = expansion(mult = c(0, 0.05)),
+    labels = scales::comma
+  ) +
+  scale_x_continuous(expand = expansion(mult = c(0.01, 0.01))) +
+  coord_cartesian(xlim = c(min(full_ts$brood_year), max(full_ts$brood_year))) +
+  scale_fill_viridis_d(option = "mako", end = 0.9) +
+  scale_alpha_discrete(range = c(1, 0.60)) +
+  guides(alpha = "none") +
+  labs(
+    x = "Année de relevé",
+    y = "Estimation de l’abondance des géniteurs",
+    fill = "Catégorie de population"
+  ) +
+  theme_bw(base_size = 14) +
+  theme(
+    legend.position = c(0.05, 0.95),
+    legend.justification = c(0, 1),
+    #strip.text = element_blank(),
+    strip.background = element_rect(fill = "white"),
+    legend.background = element_rect(colour = "black")
+  )
+)
+
+
+# Save the french version of the plot 
+ggsave(
+  ts_alpha_fr,
+  filename = here(
+    "3. R outputs",
+    "Full abundance time series (incl BC-16s)",
+    "R-PLOT_full_abundance_ts_alpha_french.png"
+  ),
+  height = 4, 
+  width = 9,
+  units = "in"
+)
