@@ -959,7 +959,7 @@ mod1 <- lmer(
   contrasts = list(resolved_age = 'contr.sum', dataset = 'contr.sum'),
   REML = FALSE,
   control = lmerControl(optimizer = "bobyqa"),
-  data = strict_data
+  data = mutate(strict_data, resolved_age = factor(resolved_age))
 )
 # Model converges
 
@@ -1014,6 +1014,47 @@ sampvals |>
   # Convert to percentages, and use per-decade values
   mutate(across(avg_slope:uci, ~.x*100*10))
   
+
+# Estimate changes in length per year by age
+vnames2 <- str_subset(names(fixef(mod1)), "Intercept|(?<=(|resolved_age\\d:))scale\\(year(?!.*\\):)")
+m2 <- fixef(mod1)[vnames2]
+v2 <- as.matrix(vcov(mod1))[vnames2, vnames2]
+
+sampvals2 <- MASS::mvrnorm(100000, mu = m2, Sigma = v2) |> 
+  as_tibble() |> 
+  rename(
+    "intercept" = 1,
+    "year" = 2,
+    "a3adj" = 3,
+    "a4adj" = 4
+  ) |> 
+  mutate(
+    val_a3 = year + a3adj,
+    val_a4 = year + a4adj,
+    val_a5 = year - (a3adj + a4adj),
+    across(matches("val_a\\d"), \(x) x/intercept, .names = "{str_replace(.col, 'val', 'slope')}")
+  )
+
+# Summarize sample vals to show estimated % change in lengths over time
+sampvals2 |> 
+  pivot_longer(
+    cols = contains("_"),
+    names_sep = "_",
+    names_to = c("measure", "age")
+  ) |> 
+  pivot_wider(
+    names_from = measure,
+    values_from = value
+  ) |> 
+  summarize(
+    .by = age,
+    avg_slope = mean(slope),
+    lci = quantile(slope, c(0.025)),
+    uci = quantile(slope, c(0.975))
+  ) |> 
+  # Convert to percentages, and use per-decade values
+  mutate(across(avg_slope:uci, ~.x*100*10))
+
 
 # Dataset of model predictions
 mod1_preds <- strict_data |> 
